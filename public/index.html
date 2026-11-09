@@ -690,7 +690,7 @@
     </div>
     <div class="top-actions">
       <span class="power-state" id="powerState">—</span>
-      <span class="badge offline" id="badge"><span class="dot"></span><span id="badgeText">Connessione…</span></span>
+      <span class="badge offline" id="badge"><span class="dot"></span><span id="badgeText">Connecting…</span></span>
       <button class="power-btn" id="powerBtn" title="Accendi / Standby" disabled aria-label="Accendi o standby">
         <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
           <path d="M12 3v9"/><path d="M6.4 6.4a8 8 0 1 0 11.2 0"/>
@@ -706,15 +706,15 @@
       <div class="panel-head">
         <h2 id="listTitle">USB Tracklist</h2>
         <div style="display: flex; gap: 4px;">
-          <button class="panel-action" id="listUpBtn" title="Su">↑</button>
-          <button class="panel-action" id="listDownBtn" title="Giù">↓</button>
-          <button class="panel-action" id="listBackBtn" title="Indietro" style="display: none;">←</button>
-          <button class="panel-action" id="listRefreshBtn" title="Aggiorna lista">↻</button>
+          <button class="panel-action" id="listUpBtn" title="Up">↑</button>
+          <button class="panel-action" id="listDownBtn" title="Down">↓</button>
+          <button class="panel-action" id="listBackBtn" title="Back" style="display: none;">←</button>
+          <button class="panel-action" id="listRefreshBtn" title="Refresh list">↻</button>
         </div>
       </div>
       <div class="list-search">
-        <input type="search" id="listSearch" placeholder="cerca artista" autocomplete="off">
-        <button class="list-search-clear" id="listSearchClear" title="Cancella ricerca">×</button>
+        <input type="search" id="listSearch" placeholder="Search artist" autocomplete="off">
+        <button class="list-search-clear" id="listSearchClear" title="Clear search">×</button>
         <div class="list-search-count" id="listSearchCount"></div>
       </div>
       <div id="listPanel" style="overflow-y: scroll; padding: 4px 0 0; height: 400px; max-height: 400px;">
@@ -724,7 +724,7 @@
             <circle cx="6" cy="18" r="3"/>
             <circle cx="18" cy="16" r="3"/>
           </svg>
-          <div>Seleziona USB e premi ↻ per caricare la lista</div>
+          <div>Select USB and press ↻ to load the list</div>
         </div>
       </div>
     </section>
@@ -774,10 +774,10 @@
                 <path d="M44 28 L44 58 L62 58 L62 40" fill="rgba(217,171,91,0.32)"/>
                 <path d="M46 28 Q50 16 54 28" fill="none" stroke="rgba(217,171,91,0.45)" stroke-width="3" stroke-linecap="round"/>
               </svg>
-              <div class="placeholder-text">Nessuna copertina</div>
+              <div class="placeholder-text">No cover art</div>
             </div>
           </div>
-          <img id="cover" alt="Copertina del brano in riproduzione">
+          <img id="cover" alt="Album art of the current track">
           <div class="cd-disc" id="cdDisc" aria-hidden="true">
             <svg viewBox="0 0 200 200" class="cd-disc-svg">
               <defs>
@@ -832,13 +832,13 @@
       </div>
 
       <div class="track-meta">
-        <div class="source-pill" id="sourcePill">Sorgente —</div>
-        <h1 class="track-title" id="trackTitle">Nessun brano in riproduzione</h1>
+        <div class="source-pill" id="sourcePill">Source —</div>
+        <h1 class="track-title" id="trackTitle">No track playing</h1>
         <div class="track-artist" id="trackArtist"></div>
         <div class="track-album" id="trackAlbum"></div>
         <div class="track-info" id="trackInfo"></div>
         <div class="lyrics-wrap">
-          <button class="lyrics-toggle" id="lyricsToggle" title="Mostra / nascondi testo brano" aria-label="Mostra o nascondi testo brano">Testo</button>
+          <button class="lyrics-toggle" id="lyricsToggle" title="Show / hide track lyrics" aria-label="Show or hide track lyrics">Lyrics</button>
           <div class="lyrics-panel" id="lyricsPanel">
             <div class="lyrics-text" id="lyricsText"></div>
             <div class="lyrics-source" id="lyricsSource"></div>
@@ -856,7 +856,7 @@
     <!-- RIGHT: Side panels -->
     <aside class="side">
       <section class="panel glass compact transport-panel">
-        <div class="panel-head"><h2>Riproduzione</h2></div>
+        <div class="panel-head"><h2>Playback</h2></div>
         <div class="transport">
           <button class="side-btn" id="prevBtn" title="Brano precedente" aria-label="Brano precedente" disabled>
             <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6"/></svg>
@@ -930,32 +930,32 @@
             <span class="dac-filter-value" id="dacFilterValue">—</span>
           </div>
           <div class="dac-options" id="dacOptions" role="group" aria-label="Filtro digitale DAC">
-            <button type="button" class="dac-option" data-dac="00" title="Suono morbido e fluido: smussa le alte frequenze, ideale per voci, jazz e acustica" disabled>Slow</button>
-            <button type="button" class="dac-option" data-dac="01" title="Suono preciso e definito (predefinito): profilo neutro e dettagliato" disabled>Sharp</button>
-            <button type="button" class="dac-option" data-dac="02" title="Attacco rapido e dinamico: più ritmo, ideale per rock ed elettronica" disabled>Short</button>
+            <button type="button" class="dac-option" data-dac="00" title="Smooth and fluid sound: softens high frequencies, ideal for voices, jazz and acoustic" disabled>Slow</button>
+            <button type="button" class="dac-option" data-dac="01" title="Precise and defined sound (default): neutral and detailed profile" disabled>Sharp</button>
+            <button type="button" class="dac-option" data-dac="02" title="Fast and dynamic attack: more rhythm, ideal for rock and electronics" disabled>Short</button>
           </div>
           <div class="dac-hint" id="dacFilterHint">—</div>
         </div>
       </section>
 
       <section class="panel glass">
-        <div class="panel-head"><h2>Sorgente</h2></div>
+        <div class="panel-head"><h2>Source</h2></div>
         <div class="source-groups" id="sourcesGrid"></div>
         <div id="cdInfoPanel">
-          <h3>Info CD (MusicBrainz)</h3>
-          <input type="text" id="cdDiscId" placeholder="Disc ID CD (opzionale)">
+          <h3>CD Info (MusicBrainz)</h3>
+          <input type="text" id="cdDiscId" placeholder="CD Disc ID (optional)">
           <div class="cd-row">
-            <input type="text" id="cdArtist" placeholder="Artista (opzionale)">
-            <input type="text" id="cdAlbum" placeholder="Titolo disco (opzionale)">
+            <input type="text" id="cdArtist" placeholder="Artist (optional)">
+            <input type="text" id="cdAlbum" placeholder="Album title (optional)">
           </div>
-          <button id="cdLookupBtn">Cerca su MusicBrainz</button>
+          <button id="cdLookupBtn">Search MusicBrainz</button>
           <div id="cdResult"></div>
           <div class="cd-track-sync">
-            <span>Traccia in ascolto: <strong id="cdTrackNum">—</strong></span>
-            <button type="button" class="cd-sync-btn" id="cdTrackPrev" title="Allinea il contatore alla traccia precedente">−</button>
-            <button type="button" class="cd-sync-btn" id="cdTrackNext" title="Allinea il contatore alla traccia successiva">+</button>
+            <span>Current track: <strong id="cdTrackNum">—</strong></span>
+            <button type="button" class="cd-sync-btn" id="cdTrackPrev" title="Align counter to previous track">−</button>
+            <button type="button" class="cd-sync-btn" id="cdTrackNext" title="Align counter to next track">+</button>
           </div>
-          <div class="cd-sync-hint">Il ricevitore non comunica il numero di traccia del CD: il contatore segue le skip inviate dall'app. Usa ± per riallinearlo al display del dispositivo.</div>
+          <div class="cd-sync-hint">The receiver does not report the CD track number: the counter follows skips sent from the app. Use ± to realign it with the device display.</div>
           <div id="cdSelectedPanel">
             <h3>Tracklist CD selezionata</h3>
             <div class="cd-selected-meta" id="cdSelectedMeta"></div>
@@ -968,11 +968,11 @@
    </main>
 
   <details class="diagnostics glass" id="diagBox">
-    <summary>Diagnostica connessione / impostazioni dispositivo</summary>
+    <summary>Connection diagnostics / device settings</summary>
     <div class="diag-body">
       <div class="diag-controls">
-        <input type="text" id="hostInput" placeholder="IP dispositivo" value="192.168.100.6" aria-label="Indirizzo IP del dispositivo">
-        <button id="saveHost">Salva IP</button>
+        <input type="text" id="hostInput" placeholder="Device IP" value="192.168.100.6" aria-label="Device IP address">
+        <button id="saveHost">Save IP</button>
         <button id="diagBtn">Test</button>
         <button id="wolBtn">Wake-on-LAN</button>
       </div>
@@ -1117,7 +1117,7 @@ function updateArt(st) {
   const frame = $('coverFrame');
   const cdMode = st.input === '23';
 
-  // Sorgente CD: la copertina del dispositivo non è significativa, al suo
+  // CD source: device cover art is not meaningful, instead
   // posto viene mostrato un disco generico animato (gira quando in play,
   // si ferma in pausa).
   if (frame) {
@@ -1328,7 +1328,7 @@ function renderStatus(s) {
     text.textContent = 'Connesso';
   } else if (s.connecting) {
     badge.classList.add('connecting');
-    text.textContent = 'Connessione…';
+    text.textContent = 'Connecting…';
   } else {
     badge.classList.add('offline');
     text.textContent = 'Offline' + (s.lastError ? ' · ' + s.lastError : '');
@@ -1339,20 +1339,20 @@ function renderStatus(s) {
 }
 
 const PLAY_LABELS = {
-  play: 'In riproduzione',
-  pause: 'In pausa',
-  stop: 'Fermo',
-  'fast-forward': 'Avanti veloce',
-  rewind: 'Indietro veloce',
-  end: 'Fine',
+  play: 'Playing',
+  pause: 'Paused',
+  stop: 'Stopped',
+  'fast-forward': 'Fast forward',
+  rewind: 'Rewind',
+  end: 'End',
 };
 
 // Filtro digitale del DAC interno (comando eISCP DGF).
 // 00 = Slow, 01 = Sharp (predefinito), 02 = Short.
 const DAC_OPTIONS = {
-  '00': { label: 'Slow', hint: 'Suono morbido e fluido: smussa le alte frequenze, ideale per voci, jazz e acustica.' },
-  '01': { label: 'Sharp', hint: 'Suono preciso e definito (predefinito): profilo neutro e dettagliato.' },
-  '02': { label: 'Short', hint: 'Attacco rapido e dinamico: più ritmo e “forwardness”, ideale per rock ed elettronica.' },
+  '00': { label: 'Slow', hint: 'Smooth and fluid sound: softens high frequencies, ideal for voices, jazz and acoustic.' },
+  '01': { label: 'Sharp', hint: 'Precise and defined sound (default): neutral and detailed profile.' },
+  '02': { label: 'Short', hint: 'Fast and dynamic attack: more rhythm and "forwardness", ideal for rock and electronics.' },
 };
 
 // --- Testi canzone -----------------------------------------------------------
@@ -1362,7 +1362,7 @@ async function fetchLyrics(artist, title) {
   const key = (artist + ' - ' + title).toLowerCase();
   if (lyricsCache[key]) return lyricsCache[key];
 
-  console.log('[lyrics] cercando testo per:', artist, title);
+  console.log('[lyrics] searching lyrics for:', artist, title);
 
   const sources = [
     // 1) API pubblica gratuita senza chiave (api.lyrics.ovh)
@@ -1448,12 +1448,12 @@ function renderLyrics(st) {
     toggle.disabled = false;
     if (cached.text) {
       textEl.textContent = cached.text;
-      sourceEl.textContent = 'Fonte: ' + cached.source;
+      sourceEl.textContent = 'Source: ' + cached.source;
       sourceEl.style.display = 'block';
     } else {
       textEl.textContent = '';
       sourceEl.style.display = 'none';
-      textEl.insertAdjacentHTML('beforeend', '<div class="lyrics-empty">Testo non disponibile per questo brano.</div>');
+      textEl.insertAdjacentHTML('beforeend', '<div class="lyrics-empty">Lyrics not available for this track.</div>');
     }
     panel.classList.remove('show');
     panel.classList.add('show');
@@ -1474,11 +1474,11 @@ function renderLyrics(st) {
     toggle.disabled = false;
     if (res && res.text) {
       textEl.textContent = res.text;
-      sourceEl.textContent = 'Fonte: ' + res.source;
+      sourceEl.textContent = 'Source: ' + res.source;
       sourceEl.style.display = 'block';
     } else {
       textEl.textContent = '';
-      textEl.insertAdjacentHTML('beforeend', '<div class="lyrics-empty">Testo non disponibile per questo brano.</div>');
+      textEl.insertAdjacentHTML('beforeend', '<div class="lyrics-empty">Lyrics not available for this track.</div>');
       sourceEl.style.display = 'none';
     }
     panel.classList.add('show');
@@ -1486,7 +1486,7 @@ function renderLyrics(st) {
     if (currentLyricsKey !== key) return;
     toggle.disabled = false;
     textEl.textContent = '';
-    textEl.insertAdjacentHTML('beforeend', '<div class="lyrics-empty">Errore nel caricamento del testo.</div>');
+    textEl.insertAdjacentHTML('beforeend', '<div class="lyrics-empty">Error loading lyrics.</div>');
     sourceEl.style.display = 'none';
     panel.classList.add('show');
     console.error('[lyrics] errore:', e);
@@ -1542,7 +1542,7 @@ function renderState(st) {
     const t = String(st.title).trim();
     if (t && !/^net$/i.test(t) && t.toLowerCase() !== 'play queue') sourceName = t;
   }
-  $('sourcePill').textContent = 'Sorgente · ' + (sourceName || '—');
+  $('sourcePill').textContent = 'Source · ' + (sourceName || '—');
   renderInputChips(st.input);
   // Il pannello sinistro mostra la tracklist USB oppure quella del CD
   // (MusicBrainz) in base alla sorgente attiva.
@@ -1555,7 +1555,7 @@ function renderState(st) {
   }
 
   // Now playing
-  // Sorgente CD: il ricevitore non invia i metadati del CD audio (NTI/NAT/NAL
+  // CD source: the receiver does not send CD audio metadata (NTI/NAT/NAL
   // vuoti) e non comunica il numero di traccia: quest'ultimo viene tracciato
   // dal controller (eiscp.js) e, se è stata selezionata una tracklist
   // MusicBrainz, permette di mostrare anche il titolo della traccia.
@@ -1564,12 +1564,12 @@ function renderState(st) {
   const cdTrackNum = trackInfo.trackNum;
   if (isCdSource) {
     $('trackTitle').textContent = trackInfo.title
-      || (cdTrackNum ? 'Traccia ' + cdTrackNum : 'Nessun brano in riproduzione');
+      || (cdTrackNum ? 'Track ' + cdTrackNum : 'No track playing');
     $('trackArtist').textContent = trackInfo.artist;
     $('trackAlbum').textContent = trackInfo.album;
-    $('sourcePill').textContent = 'CD Audio' + (cdTrackNum ? ' · Traccia ' + cdTrackNum : '');
+    $('sourcePill').textContent = 'CD Audio' + (cdTrackNum ? ' · Track ' + cdTrackNum : '');
   } else {
-    $('trackTitle').textContent = trackInfo.title || 'Nessun brano in riproduzione';
+    $('trackTitle').textContent = trackInfo.title || 'No track playing';
     $('trackArtist').textContent = trackInfo.artist;
     $('trackAlbum').textContent = trackInfo.album;
   }
@@ -1678,12 +1678,12 @@ async function command(action, value, extra) {
     });
     const data = await res.json();
     if (!res.ok) {
-      toast((data.error || 'Errore') + (data.detail ? ' (' + data.detail + ')' : ''));
+      toast((data.error || 'Error') + (data.detail ? ' (' + data.detail + ')' : ''));
       return null;
     }
     return data;
   } catch (e) {
-    toast('Errore: ' + e.message);
+    toast('Error: ' + e.message);
     return null;
   }
 }
@@ -1927,11 +1927,11 @@ async function runDiag() {
       }
       html += '<div class="hint">Se il server è stato avviato da Cursor/VS Code/Terminale e ottieni <code>EHOSTUNREACH</code>, su macOS 15+ manca il permesso <b>Rete locale</b> per quell\'app: usa <code>./launch.sh</code> (avvia il server via launchd) oppure abilita l\'app in <i>Impostazioni di Sistema → Privacy e sicurezza → Rete locale</i>.</div>';
     } else {
-      html += '<div class="ok"><span>Stato</span><span>Porta eISCP raggiungibile: i comandi funzionano.</span></div>';
+      html += '<div class="ok"><span>Status</span><span>eISCP port reachable: commands work.</span></div>';
     }
     $('diagOut').innerHTML = html;
   } catch (e) {
-    $('diagOut').textContent = 'Errore diagnostica: ' + e.message;
+    $('diagOut').textContent = 'Diagnostics error: ' + e.message;
   }
 }
 
@@ -1945,7 +1945,7 @@ $('saveHost').addEventListener('click', async () => {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ host }),
   });
-  toast('IP salvato: ' + host);
+  toast('IP saved: ' + host);
 });
 
 $('wolBtn').addEventListener('click', async () => {
@@ -2008,7 +2008,7 @@ function syncListMode() {
     const input = $('listSearch');
     if (input) {
       input.value = cd ? cdSearchTerm : searchTerm;
-      input.placeholder = cd ? 'cerca traccia' : 'cerca artista';
+      input.placeholder = cd ? 'search track' : 'search artist';
     }
     const clear = $('listSearchClear');
     if (clear) clear.style.display = (cd ? cdSearchTerm : searchTerm) ? 'inline-block' : 'none';
@@ -2049,7 +2049,7 @@ function renderCdTrackList() {
   const countEl = $('listSearchCount');
   if (countEl) {
     if (term) {
-      countEl.textContent = `${filtered.length} di ${tracks.length} risultato${filtered.length !== 1 ? 'i' : ''}`;
+      countEl.textContent = `${filtered.length} of ${tracks.length} result${filtered.length !== 1 ? 's' : ''}`;
       countEl.style.display = 'block';
     } else {
       countEl.style.display = 'none';
@@ -2060,13 +2060,13 @@ function renderCdTrackList() {
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
         <circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.5"/>
       </svg>
-      <div>Nessuna tracklist CD selezionata.<br>Usa il pannello “Info CD (MusicBrainz)” per cercare e selezionare una release.</div>
+      <div>No CD tracklist selected.<br>Use the “CD Info (MusicBrainz)” panel to search and select a release.</div>
     </div>`;
     container.style.display = 'block';
     return;
   }
   if (!filtered.length) {
-    container.innerHTML = `<div class="list-empty"><div>Nessun risultato per “${esc(term)}”</div></div>`;
+    container.innerHTML = `<div class="list-empty"><div>No results for “${esc(term)}”</div></div>`;
     container.style.display = 'block';
     return;
   }
@@ -2075,7 +2075,7 @@ function renderCdTrackList() {
   container.innerHTML = filtered.map((t) => {
     const isCurrent = currentIdx === t.index;
     return `<div class="track-item${isCurrent ? ' playing' : ''}" data-cd-track="${t.index}" tabindex="0" role="button"
-      title="Allinea il contatore CD a questa traccia" aria-label="Traccia ${t.index}: ${esc(t.title)}">
+      title="Align CD counter to this track" aria-label="Track ${t.index}: ${esc(t.title)}">
       <span class="track-num">${t.index}</span>
       <span class="track-title">${esc(t.title)}</span>
       <span class="track-dur">${esc(t.duration || '')}</span>
@@ -2103,8 +2103,8 @@ function cdSelectTrack(n) {
     if (state) { state.cdTrack = n; state.cdTrackKnown = true; }
     renderCdTrackList();
     renderSelectedCd();
-    toast('Contatore CD allineato alla traccia ' + n);
-  }).catch(() => toast('Errore allineamento traccia CD'));
+    toast('CD counter aligned to track ' + n);
+  }).catch(() => toast('Error aligning CD track'));
 }
 
 function renderTrackList(items, total, complete) {
@@ -2158,7 +2158,7 @@ function renderTrackList(items, total, complete) {
     const waitingTooLong = !notStarted && Date.now() - snapshotStartedAt > SNAPSHOT_TIMEOUT_MS;
     if (!waitingTooLong) {
       container.innerHTML = `<div class="list-empty">
-        <div>${notStarted ? "Premi ↻ per caricare la lista USB" : `Caricamento lista USB… (${loaded}/${total || '?'})`}</div>
+        <div>${notStarted ? "Press ↻ to load USB list" : `Loading USB list… (${loaded}/${total || '?'})`}</div>
       </div>`;
       container.style.display = "block";
       return;
@@ -2166,7 +2166,7 @@ function renderTrackList(items, total, complete) {
     // Timeout: mostra quello che abbiamo (anche se parziale).
     if (loaded === 0) {
       container.innerHTML = `<div class="list-empty">
-        <div>Lista USB vuota o dispositivo non risponde</div>
+        <div>USB list empty or device not responding</div>
       </div>`;
       container.style.display = "block";
       return;
@@ -2215,11 +2215,11 @@ function renderTrackList(items, total, complete) {
     });
     container.style.display = "block";
   } else {
-    let emptyMsg = "Nessuna traccia disponibile";
+    let emptyMsg = "No tracks available";
     if (term) {
-      emptyMsg = `Nessun risultato per “${esc(term)}”`;
+      emptyMsg = `No results for “${esc(term)}”`;
     } else if (total === 0) {
-      emptyMsg = "Lista USB vuota o dispositivo non risponde";
+      emptyMsg = "USB list empty or device not responding";
     }
     container.innerHTML = `<div class="list-empty">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
@@ -2241,7 +2241,7 @@ function enterFolder(folderId) {
   }).then((r) => r.json()).then(() => {
     // La lista verrà aggiornata automaticamente via SSE dal dispositivo
   }).catch((e) => {
-    toast("Errore cartella: " + e.message);
+    toast("Folder error: " + e.message);
   });
 }
 
@@ -2259,7 +2259,7 @@ function playTrackFromList(index) {
     }).then((r) => r.json()).then((data) => {
       toast("Passaggio a: " + track.title);
     }).catch((e) => {
-      toast("Errore: " + e.message);
+      toast("Error: " + e.message);
     });
   }
 }
@@ -2297,7 +2297,7 @@ function fetchSnapshot() {
 function refreshList() {
   if (snapshotTimer) clearTimeout(snapshotTimer);
   snapshotStartedAt = Date.now();
-  $("listPanel").innerHTML = `<div class="list-empty"><div>Caricamento lista USB…</div></div>`;
+  $("listPanel").innerHTML = `<div class="list-empty"><div>Loading USB list…</div></div>`;
   $("listPanel").style.display = "block";
   fetch('/api/list/refresh', { method: 'POST' })
     .then((r) => r.json())
@@ -2305,7 +2305,7 @@ function refreshList() {
       fetchSnapshot();
     })
     .catch((e) => {
-      toast("Errore aggiornamento: " + e.message);
+      toast("Refresh error: " + e.message);
     });
 }
 
@@ -2313,12 +2313,12 @@ function listUp() {
   fetch('/api/list/up', { method: 'POST' })
     .then((r) => r.json())
     .then(() => {
-      toast("Su");
+      toast("Up");
       snapshotStartedAt = Date.now();
       setTimeout(fetchSnapshot, 600);
     })
     .catch((e) => {
-      toast("Errore: " + e.message);
+      toast("Error: " + e.message);
     });
 }
 
@@ -2326,12 +2326,12 @@ function listDown() {
   fetch('/api/list/down', { method: 'POST' })
     .then((r) => r.json())
     .then(() => {
-      toast("Giù");
+      toast("Down");
       snapshotStartedAt = Date.now();
       setTimeout(fetchSnapshot, 600);
     })
     .catch((e) => {
-      toast("Errore: " + e.message);
+      toast("Error: " + e.message);
     });
 }
 
@@ -2339,12 +2339,12 @@ function goBack() {
   fetch('/api/list/back', { method: 'POST' })
     .then((r) => r.json())
     .then(() => {
-      toast("Tornato indietro");
+      toast("Back");
       snapshotStartedAt = Date.now();
       setTimeout(fetchSnapshot, 600);
     })
     .catch((e) => {
-      toast("Errore: " + e.message);
+      toast("Error: " + e.message);
     });
 }
 
@@ -2436,7 +2436,7 @@ if (cdLookupBtn) {
     const artist = (cdArtist.value || "").trim();
     const album = (cdAlbum.value || "").trim();
     if (!cdResult) return;
-    cdResult.innerHTML = '<div style="color:var(--muted)">Ricerca in corso…</div>';
+    cdResult.innerHTML = '<div style="color:var(--muted)">Search in progress…</div>';
 
     try {
       let data;
@@ -2449,12 +2449,12 @@ if (cdLookupBtn) {
         );
         data = await r.json();
       } else {
-        cdResult.innerHTML = '<div style="color:var(--err)">Inserisci Disc ID oppure Artista e/o Titolo disco</div>';
+        cdResult.innerHTML = '<div style="color:var(--err)">Enter Disc ID or Artist and/or Album title</div>';
         return;
       }
       renderCdResult(data);
     } catch (e) {
-      cdResult.innerHTML = '<div style="color:var(--err)">Errore: ' + e.message + "</div>";
+      cdResult.innerHTML = '<div style="color:var(--err)">Error: ' + e.message + "</div>";
     }
   });
 }
@@ -2462,7 +2462,7 @@ if (cdLookupBtn) {
 function renderCdResult(data) {
   if (!cdResult) return;
   if (!data) {
-    cdResult.innerHTML = '<div style="color:var(--muted-2)">Nessun risultato</div>';
+    cdResult.innerHTML = '<div style="color:var(--muted-2)">No results</div>';
     return;
   }
 
@@ -2470,14 +2470,14 @@ function renderCdResult(data) {
   const releases = Array.isArray(releasesRaw) ? releasesRaw : [releasesRaw];
   lastCdReleases = releases;
   if (!releases.length) {
-    cdResult.innerHTML = '<div style="color:var(--muted-2)">Nessuna release trovata</div>';
+    cdResult.innerHTML = '<div style="color:var(--muted-2)">No releases found</div>';
     return;
   }
 
   let html = "";
   releases.forEach((rel) => {
-    const title = rel.title || "Senza titolo";
-    let artist = "Sconosciuto";
+    const title = rel.title || "Untitled";
+    let artist = "Unknown";
     if (rel["artist-credit"]) {
       artist = rel["artist-credit"]
         .map((ac) => ac.name || (ac.artist && ac.artist.name) || "")
@@ -2549,9 +2549,9 @@ function adjustCdTrack(delta) {
   })
     .then(r => r.json())
     .then((data) => {
-      if (data && data.ok) toast("Traccia CD: " + data.cdTrack);
+      if (data && data.ok) toast("CD track: " + data.cdTrack);
     })
-    .catch(e => toast("Errore: " + e.message));
+    .catch(e => toast("Error: " + e.message));
 }
 
 const cdTrackPrevBtn = $("cdTrackPrev");
@@ -2567,17 +2567,17 @@ function selectCdRelease(rel) {
   // La ricerca MusicBrainz restituisce "media" ma non l'elenco delle tracce:
   // in quel caso va richiesto il dettaglio della release (inc=recordings).
   if (!tracks.length && releaseId) {
-    toast("Caricamento tracklist…");
+    toast("Loading tracklist…");
     fetch("/api/cd/release?id=" + encodeURIComponent(releaseId))
       .then((r) => r.json())
       .then((full) => {
         if (!full || !full.id) {
-          toast("Tracklist non disponibile per questa release");
+          toast("Tracklist not available for this release");
           return;
         }
         applyCdRelease(full);
       })
-      .catch((e) => toast("Errore: " + e.message));
+      .catch((e) => toast("Error: " + e.message));
     return;
   }
 
@@ -2585,8 +2585,8 @@ function selectCdRelease(rel) {
 }
 
 function applyCdRelease(rel) {
-  const title = rel.title || "Senza titolo";
-  let artist = "Sconosciuto";
+  const title = rel.title || "Untitled";
+  let artist = "Unknown";
   if (rel["artist-credit"]) {
     artist = rel["artist-credit"]
       .map((ac) => ac.name || (ac.artist && ac.artist.name) || "")
@@ -2605,7 +2605,7 @@ function applyCdRelease(rel) {
     date,
     tracks: tracks.map((t, i) => ({
       index: i + 1,
-      title: t.title || "Traccia sconosciuta",
+      title: t.title || "Unknown track",
       duration: t.length ? fmtMs(t.length) : "",
       durationMs: Number(t.length) || 0
     }))
@@ -2624,16 +2624,16 @@ function applyCdRelease(rel) {
     const withDur = currentCdInfo.tracks.filter((t) => t.durationMs > 0).length;
     if (!total || !withDur) {
       noteEl.className = "cd-duration-note warn";
-      noteEl.textContent = "MusicBrainz non pubblica la durata delle tracce per questa release: " +
-        "l'avanzamento automatico non è disponibile. Usa ± per riallineare il contatore al display del ricevitore.";
+      noteEl.textContent = "MusicBrainz does not publish track durations for this release: " +
+        "automatic advancement is not available. Use ± to realign the counter with the device display.";
     } else if (withDur < total) {
       noteEl.className = "cd-duration-note warn";
-      noteEl.textContent = "Avanzamento automatico attivo con stima per " + (total - withDur) +
-        " tracce senza durata (MusicBrainz le pubblica a volte). Il contatore può discostarsi dal display del ricevitore.";
+      noteEl.textContent = "Automatic advancement active with estimate for " + (total - withDur) +
+        " tracks without duration (MusicBrainz sometimes publishes them). The counter may differ from the device display.";
     } else {
       noteEl.className = "cd-duration-note";
-      noteEl.textContent = "Avanzamento automatico attivo: il contatore segue le durate di MusicBrainz " +
-        "(stima, il ricevitore non comunica la traccia del CD).";
+      noteEl.textContent = "Automatic advancement active: counter follows MusicBrainz durations " +
+        "(estimate, the receiver does not report the CD track number).";
     }
   }
 
@@ -2688,7 +2688,7 @@ function renderSelectedCd() {
       </div>`;
     });
   } else {
-    html = '<div style="color:var(--muted-2)">Nessuna traccia disponibile</div>';
+    html = '<div style="color:var(--muted-2)">No tracks available</div>';
   }
   tracksEl.innerHTML = html;
 }

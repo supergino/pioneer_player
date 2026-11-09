@@ -65,8 +65,8 @@ Unlike any other remote or controller for Pioneer/Onkyo receivers, this project 
 │  Browser   │ ◄───────────► │  server.js   │ ◄────────────► │  Pioneer HM86D  │
 │ index.html)│               │  (Express)   │   port 60128   │  (receiver)     │
 └────────────┘               └──────┬───────┘                └─────────────────┘
-                                   │
-                                   └── eiscp.js  (TCP client, state, polling)
+                                    │
+                                    └── eiscp.js  (TCP client, state, polling)
 ```
 
 | File | Role |
