@@ -1,0 +1,16 @@
+{
+  "name": "pioneer_player",
+  "version": "2.0.0",
+  "description": "Web controller for Pioneer/Onkyo HM86D using the eISCP protocol (TCP 60128)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": ["pioneer", "onkyo", "hm86d", "eiscp", "iscp", "controller"],
+  "author": "Andrea",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}

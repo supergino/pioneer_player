@@ -1,0 +1,2699 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0b0b0d">
+<title>Pioneer HM86D · Controller eISCP</title>
+<style>
+  :root {
+    --bg: #08080a;
+    --bg2: #111114;
+    --glass: rgba(255, 255, 255, 0.045);
+    --glass-strong: rgba(255, 255, 255, 0.075);
+    --border: rgba(255, 255, 255, 0.09);
+    --border-strong: rgba(255, 255, 255, 0.16);
+    --text: #f3f0ea;
+    --muted: #938d82;
+    --muted-2: #6c675f;
+    --gold: #d9ab5b;
+    --gold-soft: #f0cd8b;
+    --gold-dim: #8a6a34;
+    --ok: #6fce8f;
+    --warn: #e8b45a;
+    --err: #ff6b5e;
+    --radius: 22px;
+    --shadow: 0 30px 80px rgba(0, 0, 0, 0.55);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { min-height: 100%; }
+  body {
+    margin: 0;
+    background:
+      radial-gradient(1200px 700px at 15% -10%, rgba(217, 171, 91, 0.10), transparent 60%),
+      radial-gradient(900px 600px at 90% 110%, rgba(120, 90, 200, 0.08), transparent 65%),
+      linear-gradient(160deg, var(--bg2), var(--bg) 55%);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    padding: 22px;
+    overflow-x: hidden;
+  }
+  .ambient {
+    position: fixed; inset: -20%; z-index: 0; background-size: cover; background-position: center;
+    filter: blur(80px) saturate(165%) brightness(1.08);
+    opacity: 0; transform: scale(1.1); transition: opacity 1.2s ease, background-image .4s ease;
+    pointer-events: none;
+  }
+  .ambient.show { opacity: 0.5; }
+  .ambient-veil {
+    position: fixed; inset: 0; z-index: 0; background:
+      radial-gradient(90% 70% at 50% 0%, transparent, rgba(8, 8, 10, 0.5) 72%),
+      linear-gradient(180deg, rgba(8, 8, 10, 0.26), rgba(8, 8, 10, 0.88));
+    pointer-events: none;
+  }
+  .app { position: relative; z-index: 1; max-width: 1180px; margin: 0 auto; }
+  .topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
+  .brand { display: flex; align-items: center; gap: 13px; }
+  .logo { width: 42px; height: 42px; border-radius: 13px; display: grid; place-items: center; background: linear-gradient(145deg, rgba(217, 171, 91, 0.95), rgba(138, 106, 52, 0.85)); color: #1a1305; font-weight: 800; font-size: 19px; letter-spacing: -0.5px; box-shadow: 0 6px 20px rgba(217, 171, 91, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.35); }
+  .brand-name { font-size: 16px; font-weight: 650; letter-spacing: 0.2px; line-height: 1.2; }
+  .brand-name span { color: var(--gold-soft); font-weight: 500; }
+  .brand-sub { font-size: 10.5px; text-transform: uppercase; letter-spacing: 1.8px; color: var(--muted-2); margin-top: 3px; font-weight: 600; }
+  .top-actions { display: flex; align-items: center; gap: 10px; }
+  .badge { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px; font-size: 12px; font-weight: 600; background: var(--glass); border: 1px solid var(--border); color: var(--muted); backdrop-filter: blur(14px); }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); transition: all .2s; }
+  .badge.online { color: var(--ok); border-color: rgba(111, 206, 143, 0.3); }
+  .badge.online .dot { background: var(--ok); box-shadow: 0 0 10px var(--ok); }
+  .badge.connecting { color: var(--warn); border-color: rgba(232, 180, 90, 0.3); }
+  .badge.connecting .dot { background: var(--warn); animation: pulse 1.2s infinite; }
+  .badge.offline { color: var(--err); border-color: rgba(255, 107, 94, 0.3); }
+  .badge.offline .dot { background: var(--err); }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .25; } }
+  .power-btn { width: 40px; height: 40px; padding: 0; border-radius: 50%; display: grid; place-items: center; background: var(--glass); border: 1px solid var(--border); color: var(--muted); cursor: pointer; transition: all .2s; }
+  .power-btn:hover { color: var(--text); border-color: var(--border-strong); background: var(--glass-strong); }
+  .power-btn.on { color: #1a1305; background: linear-gradient(145deg, var(--gold-soft), var(--gold)); border-color: transparent; box-shadow: 0 0 22px rgba(217, 171, 91, 0.35); }
+  .power-btn:disabled { opacity: .4; cursor: not-allowed; }
+  .power-state { font-size: 11px; letter-spacing: 1.2px; text-transform: uppercase; color: var(--muted-2); font-weight: 650; }
+  .layout { display: grid; grid-template-columns: minmax(220px, 260px) minmax(0, 1fr) minmax(280px, 320px); gap: 16px; align-items: start; }
+  .left-col { display: flex; flex-direction: column; gap: 16px; }
+  .glass { background: linear-gradient(160deg, rgba(255,255,255,0.065), rgba(255,255,255,0.025)); border: 1px solid var(--border); border-radius: var(--radius); backdrop-filter: blur(26px) saturate(120%); -webkit-backdrop-filter: blur(26px) saturate(120%); box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,0.06); }
+  .now-card { padding: 20px 18px; display: flex; flex-direction: column; align-items: center; gap: 16px; }
+  .cover-stage { position: relative; width: min(100%, 320px); aspect-ratio: 1 / 1; margin-top: 4px; }
+  .cover-glow { position: absolute; inset: 0; transform: scale(1.02); border-radius: 50%; background-size: cover; background-position: center; filter: blur(46px) saturate(165%); opacity: 0; transition: opacity .8s ease; z-index: 0; }
+  .cover-glow.show { opacity: .65; }
+  .cover-frame { position: relative; z-index: 1; width: 100%; height: 100%; border-radius: 18px; overflow: hidden; background: #17171b; box-shadow: 0 34px 70px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.08); display: grid; place-items: center; }
+  .cover-frame img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity .5s ease; }
+  .cover-frame img.loaded { opacity: 1; }
+  .cover-placeholder { position: absolute; inset: 0; display: grid; place-items: center; background: radial-gradient(120% 120% at 30% 20%, rgba(217, 171, 91, 0.14), transparent 60%), linear-gradient(160deg, #1c1b18, #101013); color: rgba(217, 171, 91, 0.45); transition: opacity .4s ease; }
+  .placeholder-art { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: rgba(217,171,91,0.45); }
+  .placeholder-icon { width: 60px; height: 60px; margin-bottom: 12px; opacity: 0.75; }
+  .placeholder-text { font-size: 11px; letter-spacing: 2.5px; text-transform: uppercase; font-weight: 700; opacity: 0.75; }
+  .cover-placeholder.hide { opacity: 0; }
+  /* Disco CD generico animato (mostrato solo in sorgente CD) */
+  .cd-disc {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    display: grid;
+    place-items: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .5s ease;
+    background: radial-gradient(120% 120% at 30% 20%, rgba(217, 171, 91, 0.10), transparent 60%), linear-gradient(160deg, #1c1b18, #101013);
+  }
+  .cd-disc-svg {
+    width: 84%;
+    height: 84%;
+    animation: spin 5.5s linear infinite;
+    filter: drop-shadow(0 16px 30px rgba(0, 0, 0, 0.55));
+    will-change: transform;
+  }
+  .cover-frame.cd-mode .cd-disc { opacity: 1; }
+  .cover-frame.cd-mode.cd-paused .cd-disc-svg { animation-play-state: paused; }
+  .cover-frame.cd-mode .cover-placeholder { opacity: 0; }
+  .cover-frame.cd-mode img { opacity: 0; }
+  .cover-spinner { position: absolute; z-index: 2; width: 34px; height: 34px; border-radius: 50%; border: 2.5px solid rgba(255,255,255,0.12); border-top-color: var(--gold); animation: spin .8s linear infinite; opacity: 0; transition: opacity .2s; }
+  .cover-spinner.show { opacity: 1; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .track-meta { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 7px; width: 100%; min-height: 96px; }
+  .source-pill { display: inline-flex; align-items: center; gap: 6px; font-size: 10.5px; letter-spacing: 1.4px; text-transform: uppercase; font-weight: 700; color: var(--gold-soft); background: rgba(217, 171, 91, 0.10); border: 1px solid rgba(217, 171, 91, 0.22); padding: 5px 12px; border-radius: 999px; }
+  .track-title { margin: 0; font-size: clamp(20px, 2.3vw, 27px); font-weight: 700; letter-spacing: -0.4px; line-height: 1.2; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .track-artist { font-size: 15px; color: var(--muted); font-weight: 500; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .track-album { font-size: 13px; color: var(--muted-2); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .track-info { font-size: 11px; color: var(--muted-2); font-variant-numeric: tabular-nums; margin-top: 2px; }
+  .track-info .sep { margin: 0 6px; color: var(--border); }
+  .lyrics-wrap { margin-top: 14px; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .lyrics-toggle { background: transparent; border: 1px solid var(--border); color: var(--muted); padding: 4px 10px; border-radius: 8px; font-size: 11px; cursor: pointer; transition: all .16s; }
+  .lyrics-toggle:hover { border-color: var(--border-strong); color: var(--text); }
+  .lyrics-toggle.active { border-color: var(--gold-soft); color: var(--gold-soft); }
+  .lyrics-panel { width: 100%; max-height: 260px; overflow-y: auto; border: 1px solid var(--border); border-radius: 10px; background: rgba(0,0,0,0.25); padding: 12px 14px; font-size: 13px; line-height: 1.6; color: var(--text); display: none; flex-direction: column; gap: 6px; box-shadow: inset 0 1px 0 rgba(255,255,255,0.04); }
+  .lyrics-panel.show { display: flex; }
+  .lyrics-panel .lyrics-source { font-size: 10px; color: var(--muted-2); margin-top: 6px; border-top: 1px solid var(--border); padding-top: 6px; align-self: flex-start; }
+  .lyrics-panel .lyrics-text { white-space: pre-wrap; word-wrap: break-word; flex: 1; }
+  .lyrics-panel .lyrics-empty { color: var(--muted-2); font-style: italic; text-align: center; padding: 20px; }
+  .lyrics-panel::-webkit-scrollbar { width: 6px; }
+  .lyrics-panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 3px; }
+  .progress { width: 100%; display: flex; flex-direction: column; gap: 9px; }
+  .progress-track { height: 5px; width: 100%; background: rgba(255, 255, 255, 0.08); border-radius: 999px; overflow: hidden; }
+  .progress-fill { height: 100%; width: 0%; border-radius: 999px; background: linear-gradient(90deg, var(--gold-dim), var(--gold-soft)); box-shadow: 0 0 12px rgba(217, 171, 91, 0.5); transition: width .5s linear; }
+  .times { display: flex; justify-content: space-between; font-size: 11.5px; color: var(--muted-2); font-variant-numeric: tabular-nums; letter-spacing: 0.3px; }
+  .transport { display: flex; align-items: center; justify-content: center; gap: 14px; width: 100%; }
+  .transport button { border: 1px solid transparent; background: transparent; color: var(--muted); cursor: pointer; display: grid; place-items: center; border-radius: 50%; transition: all .18s ease; padding: 0; }
+  .transport button:hover:not(:disabled) { color: var(--text); background: var(--glass-strong); }
+  .transport button:active:not(:disabled) { transform: scale(.94); }
+  .transport button:disabled { opacity: .35; cursor: not-allowed; }
+  .transport .side-btn { width: 46px; height: 46px; }
+  .transport .side-btn svg { width: 20px; height: 20px; }
+  .transport .stop-btn { width: 40px; height: 40px; }
+  .transport .stop-btn svg { width: 14px; height: 14px; }
+  .transport .play-main { width: 64px; height: 64px; color: #171105; background: linear-gradient(150deg, var(--gold-soft), var(--gold)); box-shadow: 0 10px 30px rgba(217, 171, 91, 0.3), inset 0 1px 0 rgba(255,255,255,0.4); }
+  .transport .play-main:hover:not(:disabled) { background: linear-gradient(150deg, #f7d99c, #e3b566); color: #171105; }
+  .transport .play-main svg { width: 24px; height: 24px; }
+  .play-state { font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--muted-2); font-weight: 700; }
+  .transport-panel { display: flex; flex-direction: column; gap: 8px; }
+  .transport-panel .transport { gap: 10px; }
+  .transport-panel .play-state { text-align: center; }
+  .side { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+  .panel { padding: 20px 22px; }
+  .panel.compact { padding: 10px 14px; }
+  .panel.compact .panel-head { margin-bottom: 6px; }
+  .panel.compact .panel-head h2 { font-size: 9.5px; letter-spacing: 1.2px; }
+  .panel.compact .volume-readout { margin-bottom: 6px; }
+  .panel.compact .vol-buttons { margin-top: 6px; }
+  .panel.compact .tone-row { margin-bottom: 8px; }
+  .panel.compact .knob-label { font-size: 9px; letter-spacing: 1.2px; }
+  .panel.compact .knob-val { font-size: 10px; min-width: 28px; padding: 1px 6px; }
+  .panel.compact .knobs { padding: 4px 0 1px; gap: 8px; }
+  /* Filtro digitale del DAC (comando DGF) */
+  .dac-filter { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); }
+  .dac-filter-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 7px; }
+  .dac-filter-label { font-size: 9px; letter-spacing: 1.2px; text-transform: uppercase; color: var(--muted-2); font-weight: 700; }
+  .dac-filter-value { font-size: 10px; color: var(--gold-soft); font-weight: 700; letter-spacing: .4px; }
+  .dac-options { display: flex; gap: 6px; }
+  .dac-option {
+    flex: 1;
+    min-width: 0;
+    padding: 7px 4px;
+    background: var(--glass);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    border-radius: 8px;
+    font-size: 10.5px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all .16s;
+  }
+  .dac-option:hover:not(:disabled) { color: var(--text); border-color: var(--border-strong); background: var(--glass-strong); }
+  .dac-option.active { color: #171105; background: linear-gradient(150deg, var(--gold-soft), var(--gold)); border-color: transparent; box-shadow: 0 4px 14px rgba(217,171,91,0.22); }
+  .dac-option:disabled { opacity: .4; cursor: not-allowed; }
+  .dac-hint { margin-top: 7px; font-size: 10px; line-height: 1.45; color: var(--muted-2); min-height: 2.9em; }
+  .panel.compact .knob { width: 64px; height: 64px; }
+  .panel.compact .knob-body { inset: 10px; }
+  .panel.compact .knob-tick { height: 14px; top: 5px; }
+  .panel.mini { padding: 6px 10px; }
+  .panel.mini .panel-head { margin-bottom: 4px; }
+  .panel.mini .panel-head h2 { font-size: 9px; letter-spacing: 1px; }
+  .panel.mini .volume-readout { margin-bottom: 4px; }
+  .panel.mini .volval { font-size: 24px; }
+  .panel.mini .vol-buttons { margin-top: 4px; gap: 6px; }
+  .panel.mini .vol-buttons button { padding: 6px; font-size: 15px; }
+  .panel.mini input[type=range] { height: 3px; }
+  .panel-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px; }
+  .panel-head h2 { margin: 0; font-size: 10.5px; text-transform: uppercase; letter-spacing: 1.8px; color: var(--muted-2); font-weight: 700; }
+  .panel-action { background: transparent; border: 1px solid var(--border); color: var(--muted); border-radius: 999px; padding: 5px 12px; font-size: 11px; font-weight: 600; cursor: pointer; transition: all .18s; }
+  .panel-action:hover:not(:disabled) { color: var(--text); border-color: var(--border-strong); }
+  .panel-action.active { color: #171105; background: var(--gold); border-color: transparent; }
+  .panel-action:disabled { opacity: .4; cursor: not-allowed; }
+  .volume-readout { display: flex; align-items: baseline; gap: 8px; margin-bottom: 14px; }
+  .volval { font-size: 32px; font-weight: 700; letter-spacing: -1px; line-height: 1; font-variant-numeric: tabular-nums; background: linear-gradient(180deg, #fff, #c9c2b5); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .volunit { font-size: 13px; color: var(--muted-2); font-weight: 600; }
+  .vol-buttons { display: flex; gap: 9px; margin-top: 13px; }
+  .vol-buttons button { flex: 1; background: var(--glass); border: 1px solid var(--border); color: var(--text); border-radius: 12px; padding: 10px; font-size: 16px; cursor: pointer; transition: all .18s; }
+  .vol-buttons button:hover:not(:disabled) { background: var(--glass-strong); border-color: var(--border-strong); }
+  .vol-buttons button:disabled { opacity: .4; cursor: not-allowed; }
+  input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 5px; border-radius: 999px; background: rgba(255,255,255,0.1); outline: none; cursor: pointer; }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 17px; height: 17px; border-radius: 50%; background: linear-gradient(150deg, var(--gold-soft), var(--gold)); border: none; box-shadow: 0 0 0 4px rgba(217,171,91,0.14), 0 2px 8px rgba(0,0,0,0.5); transition: box-shadow .18s; }
+  input[type=range]::-webkit-slider-thumb:hover { box-shadow: 0 0 0 6px rgba(217,171,91,0.2), 0 2px 8px rgba(0,0,0,0.5); }
+  input[type=range]::-moz-range-thumb { width: 17px; height: 17px; border-radius: 50%; background: var(--gold); border: none; box-shadow: 0 0 0 4px rgba(217,171,91,0.14); }
+  input[type=range]:disabled { opacity: .4; cursor: not-allowed; }
+  .source-groups { display: flex; flex-direction: column; gap: 12px; max-height: 300px; overflow-y: auto; padding-right: 4px; -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 18px), transparent); mask-image: linear-gradient(to bottom, #000 calc(100% - 18px), transparent); }
+  .source-groups::-webkit-scrollbar { width: 5px; }
+  .source-groups::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 999px; }
+  .source-group { display: flex; flex-direction: column; gap: 7px; }
+  .source-group + .source-group { border-top: 1px solid var(--border); padding-top: 10px; }
+  .source-group-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+  .source-group-title { font-size: 9px; letter-spacing: 1.2px; text-transform: uppercase; color: var(--gold-soft); font-weight: 700; }
+  .source-group-hint { font-size: 9.5px; color: var(--muted-2); text-align: right; }
+  .source-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .source-group-note { font-size: 10px; line-height: 1.45; color: var(--muted-2); }
+  .source-chip { padding: 6px 11px; font-size: 11px; }
+  .chip { background: rgba(255,255,255,0.035); border: 1px solid var(--border); color: var(--muted); border-radius: 999x; padding: 7px 13px; font-size: 11.5px; font-weight: 600; cursor: pointer; transition: all .16s; white-space: nowrap; }
+  .chip:hover:not(:disabled) { color: var(--text); border-color: var(--border-strong); background: var(--glass-strong); }
+  .chip.active { color: #171105; background: linear-gradient(150deg, var(--gold-soft), var(--gold)); border-color: transparent; box-shadow: 0 4px 16px rgba(217,171,91,0.25); }
+  .chip:disabled { opacity: .4; cursor: not-allowed; }
+
+  .cd-select-btn {
+    background: var(--glass);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 11px;
+    cursor: pointer;
+    margin-top: 6px;
+  }
+  .cd-select-btn:hover { background: var(--glass-strong); border-color: var(--border-strong); }
+  .cd-select-btn.selected {
+    color: #171105;
+    background: var(--gold);
+    border-color: transparent;
+  }
+  #cdSelectedPanel {
+    margin-top: 10px;
+    padding: 10px 12px;
+    background: var(--glass);
+    border: 1px solid var(--border);
+    border-radius: 11px;
+    display: none;
+    flex-direction: column;
+    gap: 8px;
+    font-size: 12px;
+  }
+  #cdSelectedPanel.show { display: flex; }
+  #cdSelectedPanel h3 { margin: 0 0 6px; font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--muted-2); font-weight: 700; }
+  .cd-selected-meta { font-size: 11px; color: var(--muted-2); margin-bottom: 6px; }
+  .cd-duration-note {
+    font-size: 11px;
+    line-height: 1.45;
+    color: var(--muted-2);
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 6px 8px;
+  }
+  .cd-duration-note:empty { display: none; }
+  .cd-duration-note.warn { color: #f0c36d; border-color: rgba(240, 195, 109, 0.35); }
+  .cd-track-sync {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--text);
+    margin: 10px 0 2px;
+  }
+  .cd-track-sync strong { color: var(--gold); font-variant-numeric: tabular-nums; }
+  .cd-sync-btn {
+    background: var(--glass);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    width: 24px;
+    height: 22px;
+    line-height: 1;
+    font-size: 14px;
+    cursor: pointer;
+    padding: 0;
+  }
+  .cd-sync-btn:hover { background: var(--glass-strong); border-color: var(--border-strong); }
+  .cd-sync-hint { font-size: 10px; color: var(--muted-2); line-height: 1.45; margin-bottom: 4px; }
+  .cd-selected-track {
+    display: flex;
+    gap: 10px;
+    margin: 2px 0;
+    font-size: 12px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  .cd-selected-track:hover { background: var(--glass-strong); }
+  .cd-selected-track.current {
+    background: rgba(217,171,91,0.15);
+    border: 1px solid rgba(217,171,91,0.3);
+    color: var(--gold-soft);
+  }
+  .cd-selected-track.current .cd-selected-track-title { font-weight: 600; }
+  .cd-selected-track-num { width: 24px; color: var(--muted-2); }
+  .cd-selected-track-title { flex: 1; }
+  .cd-selected-track-dur { color: var(--muted-2); width: 40px; text-align: right; }
+
+  #cdInfoPanel {
+    margin-top: 10px;
+    padding: 10px 12px;
+    background: var(--glass);
+    border: 1px solid var(--border);
+    border-radius: 11px;
+    display: none;
+    flex-direction: column;
+    gap: 8px;
+    font-size: 12px;
+  }
+  #cdInfoPanel.show { display: flex; }
+  #cdInfoPanel h3 { margin: 0 0 6px; font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--muted-2); font-weight: 700; }
+  #cdInfoPanel input { width: 100%; padding: 6px 10px; border: 1px solid var(--border); border-radius: 8px; background: rgba(255,255,255,0.045); color: var(--text); font-size: 12px; box-sizing: border-box; margin-bottom: 6px; }
+  #cdInfoPanel input:focus { outline: none; border-color: var(--gold-dim); }
+  #cdInfoPanel .cd-row { display: flex; gap: 6px; }
+  #cdInfoPanel .cd-row input { flex: 1; margin-bottom: 0; }
+  #cdInfoPanel button { background: var(--glass); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 6px 12px; font-size: 12px; cursor: pointer; width: fit-content; align-self: start; }
+  #cdInfoPanel button:hover { background: var(--glass-strong); border-color: var(--border-strong); }
+  #cdResult { margin-top: 8px; font-size: 12.5px; color: var(--text); }
+  #cdResult .cd-release { margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+  #cdResult .cd-release:last-child { border-bottom: none; margin-bottom: 0; }
+  #cdResult .cd-release-title { font-weight: 700; color: var(--gold-soft); margin-bottom: 4px; }
+  #cdResult .cd-release-meta { font-size: 11px; color: var(--muted-2); margin-bottom: 6px; }
+  #cdResult .cd-track { display: flex; gap: 10px; margin: 2px 0; font-size: 12px; }
+  #cdResult .cd-track-num { width: 24px; color: var(--muted-2); }
+  #cdResult .cd-track-title { flex: 1; }
+  #cdResult .cd-track-dur { color: var(--muted-2); width: 40px; text-align: right; }
+  .tone-row { display: flex; flex-direction: column; gap: 7px; margin-bottom: 16px; }
+  .tone-row:last-child { margin-bottom: 0; }
+  .tone-label { display: flex; justify-content: space-between; align-items: baseline; font-size: 12px; color: var(--muted); }
+  .tone-label b { color: var(--text); font-variant-numeric: tabular-nums; font-size: 13px; }
+  .field { display: flex; flex-direction: column; gap: 7px; margin-bottom: 14px; }
+  .field:last-child { margin-bottom: 0; }
+  .field label { font-size: 12px; color: var(--muted); }
+  select { width: 100%; background: rgba(255,255,255,0.045); color: var(--text); border: 1px solid var(--border); border-radius: 11px; padding: 10px 12px; font-size: 13px; outline: none; cursor: pointer; transition: border-color .18s; }
+  select:hover:not(:disabled) { border-color: var(--border-strong); }
+  select:disabled { opacity: .4; cursor: not-allowed; }
+  select option { background: #1a191d; color: var(--text); }
+  .diagnostics { margin-top: 18px; padding: 0; overflow: hidden; }
+  .diagnostics summary { list-style: none; cursor: pointer; padding: 17px 22px; display: flex; align-items: center; justify-content: space-between; font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--muted-2); font-weight: 700; user-select: none; }
+  .diagnostics summary::-webkit-details-marker { display: none; }
+  .diagnostics summary::after { content: ''; width: 8px; height: 8px; border-right: 1.5px solid var(--muted-2); border-bottom: 1.5px solid var(--muted-2); transform: rotate(45deg); transition: transform .2s; margin-left: 12px; }
+  .diagnostics[open] summary::after { transform: rotate(-135deg); }
+  .diag-body { padding: 0 22px 20px; }
+  .diag-controls { display: flex; gap: 9px; flex-wrap: wrap; margin-bottom: 14px; }
+  .diag-controls input[type=text] { flex: 1 1 170px; min-width: 0; background: rgba(255,255,255,0.045); color: var(--text); border: 1px solid var(--border); border-radius: 11px; padding: 10px 12px; font-size: 13px; outline: none; }
+  .diag-controls input[type=text]:focus { border-color: var(--gold-dim); }
+  .diag-controls button { background: var(--glass); color: var(--text); border: 1px solid var(--border); border-radius: 11px; padding: 10px 15px; font-size: 12.5px; font-weight: 600; cursor: pointer; transition: all .18s; }
+  .diag-controls button:hover { background: var(--glass-strong); border-color: var(--border-strong); }
+  .diag-list { display: flex; flex-direction: column; gap: 0; font-size: 13px; }
+  .diag-list > div { display: flex; justify-content: space-between; gap: 14px; padding: 9px 0; border-bottom: 1px solid rgba(255,255,255,0.055); }
+  .diag-list > div:last-child { border-bottom: none; }
+  .ok { color: var(--ok); }
+  .bad { color: var(--err); }
+  .warnc { color: var(--warn); }
+  .hint { font-size: 12px; color: var(--muted-2); margin-top: 12px; line-height: 1.6; }
+  .hint code { background: rgba(255,255,255,0.07); padding: 1px 5px; border-radius: 4px; font-size: 11px; color: var(--muted); }
+  pre#log { max-height: 240px; overflow: auto; font-size: 11.5px; line-height: 1.65; color: #9a948a; background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.05); padding: 12px 14px; border-radius: 12px; margin: 14px 0 0; font-family: "SF Mono", ui-monospace, Menlo, monospace; }
+  pre#log::-webkit-scrollbar { width: 6px; height: 6px; }
+  pre#log::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 999px; }
+  .toast { position: fixed; bottom: 26px; left: 50%; transform: translate(-50%, 14px); background: rgba(30, 29, 33, 0.92); backdrop-filter: blur(20px); border: 1px solid var(--border-strong); color: var(--text); padding: 12px 20px; border-radius: 14px; font-size: 13px; font-weight: 500; box-shadow: 0 18px 50px rgba(0,0,0,0.6); opacity: 0; transition: opacity .25s, transform .25s; pointer-events: none; z-index: 50; max-width: 90vw; }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+  @media (max-width: 900px) { body { padding: 16px; } .layout { grid-template-columns: 1fr; } .now-card { padding: 22px 18px; } .cover-stage { width: min(100%, 340px); } .side { display: grid; grid-template-columns: 1fr 1fr; } .transport-panel { grid-column: 1 / -1; } }
+  @media (max-width: 580px) { .side { grid-template-columns: 1fr; } .topbar { margin-bottom: 18px; } .brand-sub { display: none; } .power-state { display: none; } .track-meta { min-height: 84px; } .volval { font-size: 28px; } .transport { gap: 10px; } }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  /* Track list items */
+  .track-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 12px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all .16s;
+    border: 1px solid transparent;
+    margin-bottom: 4px;
+  }
+  .track-item:hover {
+    background: var(--glass-strong);
+    border-color: var(--border);
+  }
+  .track-item.playing {
+    background: rgba(217, 171, 91, 0.12);
+    border-color: rgba(217, 171, 91, 0.3);
+  }
+  .track-item.muted {
+    color: var(--muted-2);
+    font-size: 12px;
+    cursor: default;
+  }
+  .track-item.muted:hover {
+    background: transparent;
+    border-color: transparent;
+  }
+  .track-num {
+    font-size: 11px;
+    color: var(--muted-2);
+    font-variant-numeric: tabular-nums;
+    min-width: 20px;
+    text-align: right;
+  }
+  .track-item .track-title {
+    flex: 1;
+    font-size: 12.5px;
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .track-item .track-dur {
+    flex-shrink: 0;
+    font-size: 11px;
+    color: var(--muted-2);
+    font-variant-numeric: tabular-nums;
+  }
+  .track-item.playing .track-title {
+    color: var(--gold-soft);
+    font-weight: 600;
+  }
+  .track-item-folder {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--muted);
+  }
+  .track-item-folder svg {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+  }
+  .track-item-folder .track-title {
+    color: var(--gold-soft);
+    font-weight: 500;
+  }
+  .list-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .list-panel-header span {
+    font-size: 11px;
+    color: var(--muted-2);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .list-back-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    border-radius: 8px;
+    padding: 4px 10px;
+    font-size: 11px;
+    cursor: pointer;
+    transition: all .16s;
+  }
+  .list-back-btn:hover {
+    color: var(--text);
+    border-color: var(--border-strong);
+  }
+  .list-empty {
+    padding: 20px;
+    text-align: center;
+    color: var(--muted-2);
+    font-size: 13px;
+  }
+  .list-search {
+    margin: 8px 0 6px;
+    position: relative;
+  }
+  .list-search input {
+    width: 100%;
+    padding: 7px 30px 7px 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: rgba(255,255,255,0.045);
+    color: var(--text);
+    font-size: 12px;
+    box-sizing: border-box;
+  }
+  .list-search input:focus {
+    outline: none;
+    border-color: var(--gold-dim);
+  }
+  .list-search-clear {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 16px;
+    line-height: 1;
+    padding: 0;
+    display: none;
+  }
+  .list-search-clear:hover { color: var(--text); }
+  .list-search-count {
+    font-size: 10.5px;
+    color: var(--muted-2);
+    margin-top: 4px;
+    margin-left: 2px;
+  }
+  .list-empty svg {
+    width: 40px;
+    height: 40px;
+    margin-bottom: 10px;
+    opacity: 0.5;
+  }
+
+
+  /* Tone knobs */
+  .knobs {
+    display: flex;
+    justify-content: space-around;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 8px 0 2px;
+  }
+  .knob-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
+  .knob-label {
+    font-size: 10px;
+    letter-spacing: 1.6px;
+    text-transform: uppercase;
+    color: var(--muted-2);
+    font-weight: 700;
+  }
+  .knob {
+    position: relative;
+    width: 72px;
+    height: 72px;
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+    outline: none;
+  }
+  .knob.dragging { cursor: grabbing; }
+  .knob.disabled { opacity: .4; cursor: not-allowed; }
+  .knob-svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    transform: rotate(135deg);
+    overflow: visible;
+    display: block;
+  }
+  .knob-track {
+    fill: none;
+    stroke: rgba(255,255,255,0.10);
+    stroke-width: 3;
+    stroke-dasharray: 75 100;
+    stroke-linecap: round;
+  }
+  .knob-arc {
+    fill: none;
+    stroke: var(--gold);
+    stroke-width: 3;
+    stroke-linecap: round;
+    stroke-dasharray: 0 100;
+    filter: drop-shadow(0 0 4px rgba(217,171,91,.55));
+  }
+  .knob-body {
+    position: absolute;
+    inset: 12px;
+    border-radius: 50%;
+    background:
+      radial-gradient(circle at 34% 24%, rgba(255,255,255,0.18), transparent 55%),
+      radial-gradient(circle at 50% 72%, #2b2925, #131216 72%);
+    box-shadow:
+      0 12px 26px rgba(0,0,0,.55),
+      inset 0 1px 0 rgba(255,255,255,.12),
+      inset 0 -7px 16px rgba(0,0,0,.62);
+    transition: box-shadow .18s;
+  }
+  .knob-body::before {
+    content: '';
+    position: absolute;
+    inset: 4px;
+    border-radius: 50%;
+    background: repeating-conic-gradient(
+      from 0deg,
+      rgba(255,255,255,0.055) 0deg 1.4deg,
+      transparent 1.4deg 5deg
+    );
+    -webkit-mask: radial-gradient(circle, transparent 42%, #000 46%);
+    mask: radial-gradient(circle, transparent 42%, #000 46%);
+  }
+  .knob-face {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    transform: rotate(0deg);
+    will-change: transform;
+  }
+  .knob-tick {
+    position: absolute;
+    top: 6px;
+    left: 50%;
+    width: 3px;
+    height: 17px;
+    margin-left: -1.5px;
+    border-radius: 2px;
+    background: linear-gradient(var(--gold-soft), var(--gold));
+    box-shadow: 0 0 9px rgba(217,171,91,.75);
+  }
+  .knob-val {
+    min-width: 36px;
+    text-align: center;
+    font-size: 11.5px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--text);
+    background: rgba(255,255,255,0.045);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 2px 8px;
+    transition: color .18s, border-color .18s;
+  }
+  .knob-val.nonzero { color: var(--gold-soft); border-color: rgba(217,171,91,.3); }
+
+
+
+  .scrollable-list {
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,0.2) transparent;
+  }
+  .scrollable-list::-webkit-scrollbar {
+    width: 6px;
+  }
+  .scrollable-list::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .scrollable-list::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.15);
+    border-radius: 3px;
+  }
+  .scrollable-list::-webkit-scrollbar-thumb:hover {
+    background: rgba(255,255,255,0.25);
+  }
+
+
+
+</style>
+</head>
+<body>
+<div class="ambient" id="ambient"></div>
+<div class="ambient-veil"></div>
+
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo">P</div>
+      <div>
+        <div class="brand-name">Pioneer <span>HM86D</span></div>
+        <div class="brand-sub">eISCP Network Controller</div>
+      </div>
+    </div>
+    <div class="top-actions">
+      <span class="power-state" id="powerState">—</span>
+      <span class="badge offline" id="badge"><span class="dot"></span><span id="badgeText">Connessione…</span></span>
+      <button class="power-btn" id="powerBtn" title="Accendi / Standby" disabled aria-label="Accendi o standby">
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <path d="M12 3v9"/><path d="M6.4 6.4a8 8 0 1 0 11.2 0"/>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <!-- LEFT: USB Tracklist -->
+    <div class="left-col">
+    <section class="panel glass side-list" style="padding: 16px 14px;">
+      <div class="panel-head">
+        <h2 id="listTitle">USB Tracklist</h2>
+        <div style="display: flex; gap: 4px;">
+          <button class="panel-action" id="listUpBtn" title="Su">↑</button>
+          <button class="panel-action" id="listDownBtn" title="Giù">↓</button>
+          <button class="panel-action" id="listBackBtn" title="Indietro" style="display: none;">←</button>
+          <button class="panel-action" id="listRefreshBtn" title="Aggiorna lista">↻</button>
+        </div>
+      </div>
+      <div class="list-search">
+        <input type="search" id="listSearch" placeholder="cerca artista" autocomplete="off">
+        <button class="list-search-clear" id="listSearchClear" title="Cancella ricerca">×</button>
+        <div class="list-search-count" id="listSearchCount"></div>
+      </div>
+      <div id="listPanel" style="overflow-y: scroll; padding: 4px 0 0; height: 400px; max-height: 400px;">
+        <div class="list-empty">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 18V5l12-2v13"/>
+            <circle cx="6" cy="18" r="3"/>
+            <circle cx="18" cy="16" r="3"/>
+          </svg>
+          <div>Seleziona USB e premi ↻ per caricare la lista</div>
+        </div>
+      </div>
+    </section>
+      <section class="panel glass">
+        <div class="panel-head"><h2>Sistema</h2></div>
+        <div class="field">
+          <label for="sleepSel">Sleep timer</label>
+          <select id="sleepSel" disabled>
+            <option value="off">Off</option>
+            <option value="10">10 min</option>
+            <option value="20">20 min</option>
+            <option value="30">30 min</option>
+            <option value="60">60 min</option>
+            <option value="90">90 min</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="dimmerSel">Dimmer display</label>
+          <select id="dimmerSel" disabled>
+            <option value="00">Bright</option>
+            <option value="01">Dim</option>
+            <option value="02">Dark</option>
+            <option value="08">Off</option>
+            <option value="DIM">Toggle</option>
+          </select>
+        </div>
+      </section>
+    </div>
+
+    <!-- CENTER: Now Playing -->
+    <section class="now-card glass">
+      <div class="cover-stage">
+        <div class="cover-glow" id="coverGlow"></div>
+        <div class="cover-frame" id="coverFrame">
+          <div class="cover-placeholder" id="coverPlaceholder">
+            <div class="placeholder-art">
+              <svg viewBox="0 0 100 100" class="placeholder-icon" aria-hidden="true">
+                <defs>
+                  <radialGradient id="discGrad" cx="50%" cy="50%" r="50%" fx="35%" fy="35%">
+                    <stop offset="0%" stop-color="#d9ab5b" stop-opacity="0.35"/>
+                    <stop offset="100%" stop-color="#d9ab5b" stop-opacity="0.05"/>
+                  </radialGradient>
+                </defs>
+                <circle cx="50" cy="50" r="46" fill="none" stroke="rgba(217,171,91,0.14)" stroke-width="2"/>
+                <circle cx="50" cy="50" r="38" fill="none" stroke="rgba(217,171,91,0.10)" stroke-width="1"/>
+                <circle cx="50" cy="50" r="11" fill="url(#discGrad)"/>
+                <path d="M44 28 L44 58 L62 58 L62 40" fill="rgba(217,171,91,0.32)"/>
+                <path d="M46 28 Q50 16 54 28" fill="none" stroke="rgba(217,171,91,0.45)" stroke-width="3" stroke-linecap="round"/>
+              </svg>
+              <div class="placeholder-text">Nessuna copertina</div>
+            </div>
+          </div>
+          <img id="cover" alt="Copertina del brano in riproduzione">
+          <div class="cd-disc" id="cdDisc" aria-hidden="true">
+            <svg viewBox="0 0 200 200" class="cd-disc-svg">
+              <defs>
+                <radialGradient id="cdSurface" cx="36%" cy="30%" r="78%">
+                  <stop offset="0%" stop-color="#f6f2e7"/>
+                  <stop offset="32%" stop-color="#d3dae4"/>
+                  <stop offset="58%" stop-color="#9fb0c6"/>
+                  <stop offset="82%" stop-color="#e8dcc6"/>
+                  <stop offset="100%" stop-color="#7c8ba1"/>
+                </radialGradient>
+                <linearGradient id="cdSheen" x1="8%" y1="4%" x2="92%" y2="96%">
+                  <stop offset="0%" stop-color="#ffffff" stop-opacity="0.60"/>
+                  <stop offset="38%" stop-color="#9ad7ff" stop-opacity="0.28"/>
+                  <stop offset="66%" stop-color="#ffd6a0" stop-opacity="0.32"/>
+                  <stop offset="100%" stop-color="#ffffff" stop-opacity="0.08"/>
+                </linearGradient>
+                <radialGradient id="cdLabel" cx="40%" cy="34%" r="70%">
+                  <stop offset="0%" stop-color="#f0d9a8"/>
+                  <stop offset="100%" stop-color="#c79a4e"/>
+                </radialGradient>
+              </defs>
+              <!-- superficie del disco -->
+              <circle cx="100" cy="100" r="93" fill="url(#cdSurface)"/>
+              <circle cx="100" cy="100" r="93" fill="url(#cdSheen)"/>
+              <!-- solchi concentrici -->
+              <g fill="none" stroke="rgba(30,36,46,0.16)" stroke-width="1">
+                <circle cx="100" cy="100" r="88"/>
+                <circle cx="100" cy="100" r="82"/>
+                <circle cx="100" cy="100" r="76"/>
+                <circle cx="100" cy="100" r="70"/>
+                <circle cx="100" cy="100" r="64"/>
+                <circle cx="100" cy="100" r="58"/>
+                <circle cx="100" cy="100" r="52"/>
+              </g>
+              <!-- riflesso asimmetrico: rende visibile la rotazione -->
+              <path d="M100 100 L100 7 A93 93 0 0 1 174 46 Z" fill="#ffffff" opacity="0.14"/>
+              <path d="M100 100 L100 7 A93 93 0 0 1 174 46 Z" fill="none" stroke="rgba(255,255,255,0.35)" stroke-width="1"/>
+              <!-- etichetta -->
+              <circle cx="100" cy="100" r="36" fill="url(#cdLabel)"/>
+              <circle cx="100" cy="100" r="36" fill="none" stroke="rgba(0,0,0,0.30)" stroke-width="1.2"/>
+              <path d="M100 70 A30 30 0 0 1 130 100" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="3" stroke-linecap="round"/>
+              <text x="100" y="129" text-anchor="middle" font-size="13" font-weight="700" fill="rgba(40,30,12,0.72)" font-family="system-ui, sans-serif" letter-spacing="2">CD</text>
+              <!-- foro centrale -->
+              <circle cx="100" cy="100" r="11" fill="#111114"/>
+              <circle cx="100" cy="100" r="11" fill="none" stroke="rgba(255,255,255,0.30)" stroke-width="1.4"/>
+              <!-- bordo -->
+              <circle cx="100" cy="100" r="93" fill="none" stroke="rgba(255,255,255,0.22)" stroke-width="1.4"/>
+            </svg>
+          </div>
+          <div class="cover-spinner" id="coverSpinner"></div>
+        </div>
+      </div>
+
+      <div class="track-meta">
+        <div class="source-pill" id="sourcePill">Sorgente —</div>
+        <h1 class="track-title" id="trackTitle">Nessun brano in riproduzione</h1>
+        <div class="track-artist" id="trackArtist"></div>
+        <div class="track-album" id="trackAlbum"></div>
+        <div class="track-info" id="trackInfo"></div>
+        <div class="lyrics-wrap">
+          <button class="lyrics-toggle" id="lyricsToggle" title="Mostra / nascondi testo brano" aria-label="Mostra o nascondi testo brano">Testo</button>
+          <div class="lyrics-panel" id="lyricsPanel">
+            <div class="lyrics-text" id="lyricsText"></div>
+            <div class="lyrics-source" id="lyricsSource"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="progress">
+        <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+        <div class="times"><span id="timeNow">0:00</span><span id="timeTotal">0:00</span></div>
+      </div>
+
+    </section>
+
+    <!-- RIGHT: Side panels -->
+    <aside class="side">
+      <section class="panel glass compact transport-panel">
+        <div class="panel-head"><h2>Riproduzione</h2></div>
+        <div class="transport">
+          <button class="side-btn" id="prevBtn" title="Brano precedente" aria-label="Brano precedente" disabled>
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6"/></svg>
+          </button>
+          <button class="play-main" id="playBtn" title="Riproduci / Pausa" aria-label="Riproduci o pausa" disabled>
+            <svg id="playIcon" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z"/></svg>
+          </button>
+          <button class="side-btn" id="nextBtn" title="Brano successivo" aria-label="Brano successivo" disabled>
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 6h2v12h-2zM6 6l8.5 6L6 18z"/></svg>
+          </button>
+          <button class="stop-btn" id="stopBtn" title="Stop" aria-label="Stop" disabled>
+            <svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="1.6"/></svg>
+          </button>
+        </div>
+        <div class="play-state" id="playState">—</div>
+      </section>
+
+      <section class="panel glass compact mini">
+        <div class="panel-head">
+          <h2>Volume</h2>
+          <button class="panel-action" id="muteBtn" disabled>Mute</button>
+        </div>
+        <div class="volume-readout">
+          <span class="volval" id="volVal">--</span>
+          <span class="volunit">/ 100</span>
+        </div>
+        <input type="range" id="volSlider" min="0" max="100" step="1" value="30" disabled aria-label="Volume">
+        <div class="vol-buttons">
+          <button id="volDown" disabled aria-label="Volume giù">−</button>
+          <button id="volUp" disabled aria-label="Volume su">+</button>
+        </div>
+      </section>
+
+      <section class="panel glass compact">
+        <div class="panel-head"><h2>Toni</h2></div>
+        <div class="knobs">
+          <div class="knob-wrap">
+            <div class="knob-label">Bass</div>
+            <div class="knob" id="bassKnob" role="slider" tabindex="0"
+                 aria-label="Bassi" aria-valuemin="-10" aria-valuemax="10" aria-valuenow="0"
+                 data-value="0" data-kind="bass">
+              <svg class="knob-svg" viewBox="0 0 120 120" aria-hidden="true">
+                <circle class="knob-track" cx="60" cy="60" r="52" pathLength="100"/>
+                <circle class="knob-arc" cx="60" cy="60" r="52" pathLength="100"/>
+              </svg>
+              <div class="knob-body">
+                <div class="knob-face"><span class="knob-tick"></span></div>
+              </div>
+            </div>
+            <div class="knob-val" id="bassVal">0</div>
+          </div>
+          <div class="knob-wrap">
+            <div class="knob-label">Treble</div>
+            <div class="knob" id="trebleKnob" role="slider" tabindex="0"
+                 aria-label="Alti" aria-valuemin="-10" aria-valuemax="10" aria-valuenow="0"
+                 data-value="0" data-kind="treble">
+              <svg class="knob-svg" viewBox="0 0 120 120" aria-hidden="true">
+                <circle class="knob-track" cx="60" cy="60" r="52" pathLength="100"/>
+                <circle class="knob-arc" cx="60" cy="60" r="52" pathLength="100"/>
+              </svg>
+              <div class="knob-body">
+                <div class="knob-face"><span class="knob-tick"></span></div>
+              </div>
+            </div>
+            <div class="knob-val" id="trebleVal">0</div>
+          </div>
+        </div>
+        <div class="dac-filter">
+          <div class="dac-filter-head">
+            <span class="dac-filter-label">DAC · Digital Filter</span>
+            <span class="dac-filter-value" id="dacFilterValue">—</span>
+          </div>
+          <div class="dac-options" id="dacOptions" role="group" aria-label="Filtro digitale DAC">
+            <button type="button" class="dac-option" data-dac="00" title="Suono morbido e fluido: smussa le alte frequenze, ideale per voci, jazz e acustica" disabled>Slow</button>
+            <button type="button" class="dac-option" data-dac="01" title="Suono preciso e definito (predefinito): profilo neutro e dettagliato" disabled>Sharp</button>
+            <button type="button" class="dac-option" data-dac="02" title="Attacco rapido e dinamico: più ritmo, ideale per rock ed elettronica" disabled>Short</button>
+          </div>
+          <div class="dac-hint" id="dacFilterHint">—</div>
+        </div>
+      </section>
+
+      <section class="panel glass">
+        <div class="panel-head"><h2>Sorgente</h2></div>
+        <div class="source-groups" id="sourcesGrid"></div>
+        <div id="cdInfoPanel">
+          <h3>Info CD (MusicBrainz)</h3>
+          <input type="text" id="cdDiscId" placeholder="Disc ID CD (opzionale)">
+          <div class="cd-row">
+            <input type="text" id="cdArtist" placeholder="Artista (opzionale)">
+            <input type="text" id="cdAlbum" placeholder="Titolo disco (opzionale)">
+          </div>
+          <button id="cdLookupBtn">Cerca su MusicBrainz</button>
+          <div id="cdResult"></div>
+          <div class="cd-track-sync">
+            <span>Traccia in ascolto: <strong id="cdTrackNum">—</strong></span>
+            <button type="button" class="cd-sync-btn" id="cdTrackPrev" title="Allinea il contatore alla traccia precedente">−</button>
+            <button type="button" class="cd-sync-btn" id="cdTrackNext" title="Allinea il contatore alla traccia successiva">+</button>
+          </div>
+          <div class="cd-sync-hint">Il ricevitore non comunica il numero di traccia del CD: il contatore segue le skip inviate dall'app. Usa ± per riallinearlo al display del dispositivo.</div>
+          <div id="cdSelectedPanel">
+            <h3>Tracklist CD selezionata</h3>
+            <div class="cd-selected-meta" id="cdSelectedMeta"></div>
+            <div class="cd-duration-note" id="cdDurationNote"></div>
+            <div id="cdSelectedTracks"></div>
+          </div>
+        </div>
+      </section>
+     </aside>
+   </main>
+
+  <details class="diagnostics glass" id="diagBox">
+    <summary>Diagnostica connessione / impostazioni dispositivo</summary>
+    <div class="diag-body">
+      <div class="diag-controls">
+        <input type="text" id="hostInput" placeholder="IP dispositivo" value="192.168.100.6" aria-label="Indirizzo IP del dispositivo">
+        <button id="saveHost">Salva IP</button>
+        <button id="diagBtn">Test</button>
+        <button id="wolBtn">Wake-on-LAN</button>
+      </div>
+      <div id="diagOut"></div>
+      <pre id="log" class="log"></pre>
+    </div>
+  </details>
+  <div id="toast" class="toast"></div>
+
+  <script>
+
+const $ = (id) => document.getElementById(id);
+let state = null;
+let status = null;
+let inputs = {};
+let sourceGroups = [];   // catalogo gruppi sorgenti ricevuto da /api/state
+let artKey = null;
+let artRetry = 0;
+let artUrlLoaded = null;
+let lastTrackId = '';
+let usbList = { items: [], total: 0, complete: false };
+let searchTerm = '';
+let cdSearchTerm = '';
+let listMode = null;        // 'usb' | 'cd': contenuto corrente del pannello sinistro
+let currentCdInfo = null;   // tracklist CD selezionata da MusicBrainz
+let lastCdReleases = [];    // ultime release trovate
+let snapshotTimer = null;
+let snapshotStartedAt = 0;
+const SNAPSHOT_TIMEOUT_MS = 12000; // dopo 12 s mostra comunque quanto raccolto
+let lyricsCache = {}; // chiave "artista - titolo" -> { text, source }
+let currentLyricsKey = null;
+
+// --- Utilities -----------------------------------------------------------
+function toast(msg) {
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+function esc(s) {
+  const map = { '&': '&', '<': '<', '>': '>', '"': '"', "'": "'" };
+  return String(s).replace(/[&<>"']/g, (c) => map[c]);
+}
+
+// --- Progress ------------------------------------------------------------
+const timeState = { elapsed: 0, total: 0, anchor: 0, playing: false };
+
+function clockToSeconds(str) {
+  if (!str) return null;
+  const parts = String(str).trim().split(':').map(Number);
+  if (!parts.length || parts.some((n) => Number.isNaN(n))) return null;
+  return parts.reduce((acc, n) => acc * 60 + n, 0);
+}
+
+function fmtClock(sec) {
+  if (!Number.isFinite(sec) || sec < 0) sec = 0;
+  sec = Math.floor(sec);
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = sec % 60;
+  const mm = h ? String(m).padStart(2, '0') : String(m);
+  return (h ? h + ':' : '') + mm + ':' + String(s).padStart(2, '0');
+}
+
+function liveElapsed() {
+  if (!timeState.playing) return timeState.elapsed;
+  const extra = (performance.now() - timeState.anchor) / 1000;
+  const value = timeState.elapsed + extra;
+  return timeState.total ? Math.min(timeState.total, value) : value;
+}
+
+function setPlayStatus(ps) {
+  const playing = ps === 'play';
+  if (playing !== timeState.playing) {
+    timeState.elapsed = liveElapsed();
+    timeState.anchor = performance.now();
+    timeState.playing = playing;
+  }
+}
+
+function updateTime(raw) {
+  if (!raw || typeof raw !== 'string') {
+    timeState.elapsed = 0;
+    timeState.total = 0;
+    timeState.anchor = performance.now();
+    return;
+  }
+  const [a, b] = raw.split('/');
+  const elapsed = clockToSeconds(a);
+  const total = clockToSeconds(b);
+  if (elapsed === null && total === null) return;
+
+  const current = liveElapsed();
+  const newTotal = total || timeState.total || 0;
+  const newElapsed = elapsed || 0;
+
+  if (Math.abs(newElapsed - current) > 1.5 || newTotal !== timeState.total) {
+    timeState.elapsed = newElapsed;
+    timeState.total = newTotal;
+    timeState.anchor = performance.now();
+  } else {
+    timeState.total = newTotal;
+  }
+}
+
+function renderProgress() {
+  const elapsed = liveElapsed();
+  const total = timeState.total || 0;
+  const pct = total > 0 ? Math.min(100, (elapsed / total) * 100) : 0;
+  $('progressFill').style.width = pct + '%';
+  $('timeNow').textContent = fmtClock(elapsed);
+  $('timeTotal').textContent = total > 0 ? fmtClock(total) : '0:00';
+}
+setInterval(renderProgress, 500);
+
+// --- Album art -----------------------------------------------------------
+const NOTE_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.4"/><path d="M12 3v6.6M12 14.4V21"/></svg>';
+
+function showCoverPlaceholder() {
+  $('cover').classList.remove('loaded');
+  $('cover').removeAttribute('src');
+  $('coverPlaceholder').classList.remove('hide');
+  $('coverGlow').classList.remove('show');
+  $('coverSpinner').classList.remove('show');
+  $('ambient').classList.remove('show');
+}
+
+function setArt(src, force = false) {
+  const img = $('cover');
+  $('coverPlaceholder').classList.add('hide');
+  $('coverSpinner').classList.add('show');
+  img.classList.remove('loaded');
+  if (force && !src.startsWith('data:')) {
+    src = src + (src.includes('?') ? '&' : '?') + 't=' + Date.now();
+  }
+  img.src = src;
+}
+
+function updateArt(st) {
+  const frame = $('coverFrame');
+  const cdMode = st.input === '23';
+
+  // Sorgente CD: la copertina del dispositivo non è significativa, al suo
+  // posto viene mostrato un disco generico animato (gira quando in play,
+  // si ferma in pausa).
+  if (frame) {
+    frame.classList.toggle('cd-mode', cdMode);
+    frame.classList.toggle('cd-paused', cdMode && st.playStatus !== 'play');
+  }
+  if (cdMode) {
+    if (artKey !== null || artUrlLoaded !== null) {
+      artKey = null;
+      artUrlLoaded = null;
+      showCoverPlaceholder();
+    }
+    return;
+  }
+
+  const url = st.albumArtUrl;
+  const version = st.albumArtVersion || 0;
+
+  // Identifica la traccia corrente per forzare il refresh della cover
+  // quando cambia brano anche se l'URL/version del dispositivo non sono cambiati.
+  const trackId = (st.title || '') + '||' + (st.artist || '') + '||' + (st.album || '');
+  const forceReload = trackId !== lastTrackId;
+  lastTrackId = trackId;
+
+  if (!url) {
+    if (artKey !== null) {
+      artKey = null;
+      artUrlLoaded = null;
+      showCoverPlaceholder();
+    }
+    return;
+  }
+
+  const isData = url.startsWith('data:');
+  const key = url + '#' + version;
+  if (!forceReload && key === artKey) return;
+
+  artKey = key;
+  artRetry = 0;
+  artUrlLoaded = isData ? url : '/api/art?v=' + encodeURIComponent(version);
+  setArt(artUrlLoaded, forceReload);
+}
+
+function initArtHandlers() {
+  const img = $('cover');
+
+  img.addEventListener('load', () => {
+    img.classList.add('loaded');
+    $('coverPlaceholder').classList.add('hide');
+    $('coverSpinner').classList.remove('show');
+    // In sorgente CD non si usa la copertina del dispositivo (si vede il disco animato).
+    if (state && state.input === '23') return;
+    const resolved = img.currentSrc || img.src;
+    $('coverGlow').style.backgroundImage = 'url("' + resolved + '")';
+    $('coverGlow').classList.add('show');
+    $('ambient').style.backgroundImage = 'url("' + resolved + '")';
+    $('ambient').classList.add('show');
+  });
+
+  img.addEventListener('error', () => {
+    if (artUrlLoaded && artUrlLoaded.indexOf('/api/art') === 0 && artRetry < 2) {
+      artRetry++;
+      const retryUrl = artUrlLoaded + (artUrlLoaded.indexOf('?') >= 0 ? '&' : '?') + 'r=' + artRetry;
+      setTimeout(() => { img.src = retryUrl; }, 1200 * artRetry);
+      return;
+    }
+    $('coverSpinner').classList.remove('show');
+    $('cover').classList.remove('loaded');
+    $('coverPlaceholder').classList.remove('hide');
+  });
+}
+
+// --- Sorgenti ------------------------------------------------------------
+const PRIORITY_INPUTS = ['2A', '2B', '23', '2D', '2E', '44', '45', '27', '28', '29', '2C', '12', '10', '41', '42', '11', '2F'];
+
+function orderedInputs(current) {
+  const seen = new Set();
+  const list = [];
+  const push = (code) => {
+    if (!code || seen.has(code) || !inputs[code]) return;
+    seen.add(code);
+    list.push([code, inputs[code]]);
+  };
+  PRIORITY_INPUTS.forEach(push);
+  if (current) push(current);
+  Object.keys(inputs).forEach(push);
+  return list;
+}
+
+function sourceEntry(code) {
+  for (const group of sourceGroups) {
+    const found = (group.sources || []).find((s) => s.code === code);
+    if (found) return found;
+  }
+  return null;
+}
+
+function sourceLabel(code) {
+  if (!code) return '';
+  const entry = sourceEntry(code);
+  return (entry && entry.label) || inputs[code] || code;
+}
+
+// Gruppi da mostrare: catalogo del server + eventuale sorgente attiva non
+// prevista, così una sorgente segnalata dal dispositivo non scompare mai.
+function currentSourceGroups(current) {
+  if (!sourceGroups.length) {
+    return [{
+      id: 'all',
+      title: 'Sorgenti',
+      sources: orderedInputs(current).map(([code, label]) => ({ code, label })),
+    }];
+  }
+  const groups = sourceGroups
+    .map((g) => ({
+      ...g,
+      sources: (g.sources || []).filter((s) => s.action === 'netService' || inputs[s.code] || s.code === current),
+    }))
+    .filter((g) => g.sources.length);
+  const known = new Set(groups.flatMap((g) => g.sources.map((s) => s.code)));
+  if (current && !known.has(current)) {
+    groups.push({
+      id: 'other',
+      title: 'Altre sorgenti',
+      hint: 'Segnalata dal dispositivo',
+      sources: [{ code: current, label: sourceLabel(current) }],
+    });
+  }
+  return groups;
+}
+
+function isSourceActive(chip, current, st) {
+  const code = chip.dataset.input;
+  const action = chip.dataset.action || 'input';
+  if (action === 'input') return code === current;
+  // Servizi di rete: attivo se il Pioneer è su NET (2B) e il titolo del
+  // brano/servizio corrisponde a uno dei termini di match del chip.
+  if (current !== '2B') return false;
+  const title = String((st && st.title) || '').toLowerCase();
+  const terms = (chip.dataset.match || '').toLowerCase().split('|').filter(Boolean);
+  return terms.some((t) => title.includes(t));
+}
+
+function renderInputChips(current) {
+  const grid = $('sourcesGrid');
+  if (!grid) return;
+  const groups = currentSourceGroups(current);
+  const sig = JSON.stringify(groups.map((g) => [g.id, (g.sources || []).map((s) => s.code)]));
+  if (grid.dataset.sig !== sig) {
+    grid.dataset.sig = sig;
+    grid.innerHTML = groups.map((g) => `
+      <section class="source-group" data-group="${esc(g.id)}">
+        <div class="source-group-head">
+          <span class="source-group-title">${esc(g.title)}</span>
+          ${g.hint ? `<span class="source-group-hint">${esc(g.hint)}</span>` : ''}
+        </div>
+        <div class="source-chips">
+          ${(g.sources || []).map((src) => `<button type="button" class="chip source-chip" data-input="${esc(src.code)}" data-action="${esc(src.action || 'input')}" data-service="${esc(src.service || '')}" data-match="${esc((src.match || []).join('|'))}" title="${esc(src.desc || src.label)}">${esc(src.label)}</button>`).join('')}
+        </div>
+        ${g.note ? `<div class="source-group-note">${esc(g.note)}</div>` : ''}
+      </section>`).join('');
+    grid.querySelectorAll('.chip').forEach((chip) => {
+      chip.addEventListener('click', () => {
+        const action = chip.dataset.action || 'input';
+        if (action === 'netService') command('netService', chip.dataset.service);
+        else command('input', chip.dataset.input);
+      });
+    });
+  }
+  grid.querySelectorAll('.chip').forEach((chip) => {
+    chip.classList.toggle('active', isSourceActive(chip, current, state));
+    chip.disabled = !(status && status.connected);
+  });
+  // Tieni visibile la sorgente attiva anche se il suo gruppo è più in basso.
+  const active = grid.querySelector('.chip.active');
+  if (active) {
+    const ar = active.getBoundingClientRect();
+    const gr = grid.getBoundingClientRect();
+    if (ar.top < gr.top || ar.bottom > gr.bottom) {
+      grid.scrollTop += (ar.top - gr.top) - 24;
+    }
+  }
+}
+
+// --- State rendering -----------------------------------------------------
+function setEnabled(on) {
+  [
+    'powerBtn', 'volSlider', 'volUp', 'volDown', 'muteBtn',
+    'prevBtn', 'playBtn', 'stopBtn', 'nextBtn',
+    'sleepSel', 'dimmerSel',
+  ].forEach((id) => { const el = $(id); if (el) el.disabled = !on; });
+  document.querySelectorAll('.chip').forEach((c) => { c.disabled = !on; });
+  document.querySelectorAll('.knob').forEach((k) => {
+    k.classList.toggle('disabled', !on);
+    k.tabIndex = on ? 0 : -1;
+    k.setAttribute('aria-disabled', String(!on));
+  });
+  document.querySelectorAll('.dac-option').forEach((b) => { b.disabled = !on; });
+}
+
+function renderStatus(s) {
+  status = s;
+  const badge = $('badge');
+  const text = $('badgeText');
+  badge.className = 'badge';
+  if (s.connected) {
+    badge.classList.add('online');
+    text.textContent = 'Connesso';
+  } else if (s.connecting) {
+    badge.classList.add('connecting');
+    text.textContent = 'Connessione…';
+  } else {
+    badge.classList.add('offline');
+    text.textContent = 'Offline' + (s.lastError ? ' · ' + s.lastError : '');
+  }
+  $('hostInput').value = s.host;
+  setEnabled(s.connected);
+  if (state) renderState(state);
+}
+
+const PLAY_LABELS = {
+  play: 'In riproduzione',
+  pause: 'In pausa',
+  stop: 'Fermo',
+  'fast-forward': 'Avanti veloce',
+  rewind: 'Indietro veloce',
+  end: 'Fine',
+};
+
+// Filtro digitale del DAC interno (comando eISCP DGF).
+// 00 = Slow, 01 = Sharp (predefinito), 02 = Short.
+const DAC_OPTIONS = {
+  '00': { label: 'Slow', hint: 'Suono morbido e fluido: smussa le alte frequenze, ideale per voci, jazz e acustica.' },
+  '01': { label: 'Sharp', hint: 'Suono preciso e definito (predefinito): profilo neutro e dettagliato.' },
+  '02': { label: 'Short', hint: 'Attacco rapido e dinamico: più ritmo e “forwardness”, ideale per rock ed elettronica.' },
+};
+
+// --- Testi canzone -----------------------------------------------------------
+// Cerca su più fonti e restituisce solo la PRIMA versione trovata.
+async function fetchLyrics(artist, title) {
+  if (!artist || !title) return null;
+  const key = (artist + ' - ' + title).toLowerCase();
+  if (lyricsCache[key]) return lyricsCache[key];
+
+  console.log('[lyrics] cercando testo per:', artist, title);
+
+  const sources = [
+    // 1) API pubblica gratuita senza chiave (api.lyrics.ovh)
+    async () => {
+      const url = '/api/lyrics?artist=' + encodeURIComponent(artist) +
+                  '&title=' + encodeURIComponent(title);
+      const r = await fetch(url, { signal: AbortSignal.timeout(10000) });
+      if (!r.ok) return null;
+      const j = await r.json();
+      if (j.text && j.text.trim()) return { text: j.text, source: j.source || 'api.lyrics.ovh' };
+      return null;
+    },
+  ];
+
+  for (const trySource of sources) {
+    try {
+      const res = await trySource();
+      if (res) {
+        console.log('[lyrics] trovato su:', res.source);
+        lyricsCache[key] = res;
+        return res;
+      }
+    } catch (_) {
+      // ignora e passa alla fonte successiva
+    }
+  }
+  console.log('[lyrics] nessun testo trovato');
+  lyricsCache[key] = { text: null, source: null };
+  return null;
+}
+
+// Restituisce i dati del brano effettivamente mostrato nel Now Playing.
+// Per il CD audio il ricevitore non invia i metadata (NTI/NAT/NAL vuoti),
+// quindi artista e titolo arrivano dalla tracklist MusicBrainz selezionata.
+function currentTrackInfo(st) {
+  if (st && st.input === '23') {
+    const num = (st.cdTrackKnown && st.cdTrack) ? st.cdTrack : null;
+    const track = (currentCdInfo && currentCdInfo.tracks)
+      ? currentCdInfo.tracks.find(t => t.index === num)
+      : null;
+    return {
+      artist: (currentCdInfo && currentCdInfo.artist) || '',
+      title: track ? track.title : '',
+      album: (currentCdInfo && currentCdInfo.title) || '',
+      trackNum: num,
+    };
+  }
+  return {
+    artist: (st && st.artist) || '',
+    title: (st && st.title) || '',
+    album: (st && st.album) || '',
+    trackNum: null,
+  };
+}
+
+function renderLyrics(st) {
+  const toggle = $('lyricsToggle');
+  const panel = $('lyricsPanel');
+  const textEl = $('lyricsText');
+  const sourceEl = $('lyricsSource');
+  if (!toggle || !panel) return;
+
+  // Anche per il CD: artista/titolo arrivano dalla tracklist MusicBrainz.
+  const info = currentTrackInfo(st);
+  const artist = info.artist;
+  const title = info.title;
+  const key = (artist + ' - ' + title).toLowerCase();
+
+  // Se non c'è brano valido, nascondi tutto
+  if (!artist || !title || artist === 'N/A' || title === 'N/A') {
+    toggle.disabled = true;
+    textEl.textContent = '';
+    sourceEl.textContent = '';
+    sourceEl.style.display = 'none';
+    panel.classList.remove('show');
+    currentLyricsKey = null;
+    return;
+  }
+
+  // Se è lo stesso brano e abbiamo già il testo in cache, riutilizzalo
+  if (currentLyricsKey === key && lyricsCache[key]) {
+    const cached = lyricsCache[key];
+    toggle.disabled = false;
+    if (cached.text) {
+      textEl.textContent = cached.text;
+      sourceEl.textContent = 'Fonte: ' + cached.source;
+      sourceEl.style.display = 'block';
+    } else {
+      textEl.textContent = '';
+      sourceEl.style.display = 'none';
+      textEl.insertAdjacentHTML('beforeend', '<div class="lyrics-empty">Testo non disponibile per questo brano.</div>');
+    }
+    panel.classList.remove('show');
+    panel.classList.add('show');
+    return;
+  }
+
+  currentLyricsKey = key;
+  textEl.textContent = '';
+  sourceEl.textContent = '';
+  sourceEl.style.display = 'none';
+  panel.classList.remove('show');
+  toggle.disabled = true;
+
+  // Carica il testo in background
+  fetchLyrics(artist, title).then((res) => {
+    // Aggiorna solo se è ancora lo stesso brano selezionato
+    if (currentLyricsKey !== key) return;
+    toggle.disabled = false;
+    if (res && res.text) {
+      textEl.textContent = res.text;
+      sourceEl.textContent = 'Fonte: ' + res.source;
+      sourceEl.style.display = 'block';
+    } else {
+      textEl.textContent = '';
+      textEl.insertAdjacentHTML('beforeend', '<div class="lyrics-empty">Testo non disponibile per questo brano.</div>');
+      sourceEl.style.display = 'none';
+    }
+    panel.classList.add('show');
+  }).catch((e) => {
+    if (currentLyricsKey !== key) return;
+    toggle.disabled = false;
+    textEl.textContent = '';
+    textEl.insertAdjacentHTML('beforeend', '<div class="lyrics-empty">Errore nel caricamento del testo.</div>');
+    sourceEl.style.display = 'none';
+    panel.classList.add('show');
+    console.error('[lyrics] errore:', e);
+  });
+}
+
+function toggleLyrics() {
+  const panel = $('lyricsPanel');
+  const toggle = $('lyricsToggle');
+  if (!panel) return;
+  if (panel.classList.contains('show')) {
+    panel.classList.remove('show');
+    toggle.classList.remove('active');
+  } else {
+    panel.classList.add('show');
+    toggle.classList.add('active');
+  }
+}
+
+function renderState(st) {
+  state = st;
+  if (!st) return;
+
+  // Power
+  const connected = status && status.connected;
+  const known = st.power !== null && st.power !== undefined;
+  const on = st.power === 'on';
+  const pb = $('powerBtn');
+  pb.classList.toggle('on', on);
+  pb.title = on ? 'Spegni (standby)' : 'Accendi';
+  if (!connected || !known) {
+    $('powerState').textContent = connected ? 'Lettura…' : 'Non connesso';
+  } else {
+    $('powerState').textContent = on ? 'Acceso' : 'Standby';
+  }
+
+  // Volume
+  if (st.volume !== null && st.volume !== undefined) {
+    const v = Math.max(0, Math.min(100, st.volume));
+    $('volVal').textContent = v;
+    if (document.activeElement !== $('volSlider')) $('volSlider').value = v;
+  } else {
+    $('volVal').textContent = '--';
+  }
+  const muteBtn = $('muteBtn');
+  muteBtn.classList.toggle('active', !!st.mute);
+  muteBtn.textContent = st.mute ? 'Mute ON' : 'Mute';
+
+  // Source
+  let sourceName = sourceLabel(st.input) || st.inputName || inputs[st.input] || st.input;
+  // In rete, mostra il servizio attivo (Spotify, TuneIn, ...) invece di "NET".
+  if (st.input === '2B' && st.title) {
+    const t = String(st.title).trim();
+    if (t && !/^net$/i.test(t) && t.toLowerCase() !== 'play queue') sourceName = t;
+  }
+  $('sourcePill').textContent = 'Sorgente · ' + (sourceName || '—');
+  renderInputChips(st.input);
+  // Il pannello sinistro mostra la tracklist USB oppure quella del CD
+  // (MusicBrainz) in base alla sorgente attiva.
+  syncListMode();
+
+  // Pannello Info CD visibile solo se sorgente CD (codice 23)
+  const cdPanel = $('cdInfoPanel');
+  if (cdPanel) {
+    cdPanel.classList.toggle('show', st.input === '23');
+  }
+
+  // Now playing
+  // Sorgente CD: il ricevitore non invia i metadati del CD audio (NTI/NAT/NAL
+  // vuoti) e non comunica il numero di traccia: quest'ultimo viene tracciato
+  // dal controller (eiscp.js) e, se è stata selezionata una tracklist
+  // MusicBrainz, permette di mostrare anche il titolo della traccia.
+  const isCdSource = st.input === '23';
+  const trackInfo = currentTrackInfo(st);
+  const cdTrackNum = trackInfo.trackNum;
+  if (isCdSource) {
+    $('trackTitle').textContent = trackInfo.title
+      || (cdTrackNum ? 'Traccia ' + cdTrackNum : 'Nessun brano in riproduzione');
+    $('trackArtist').textContent = trackInfo.artist;
+    $('trackAlbum').textContent = trackInfo.album;
+    $('sourcePill').textContent = 'CD Audio' + (cdTrackNum ? ' · Traccia ' + cdTrackNum : '');
+  } else {
+    $('trackTitle').textContent = trackInfo.title || 'Nessun brano in riproduzione';
+    $('trackArtist').textContent = trackInfo.artist;
+    $('trackAlbum').textContent = trackInfo.album;
+  }
+
+  // Formato file e qualità audio
+  const infoEl = $('trackInfo');
+  const parts = [];
+  if (st.fileFormat) parts.push(st.fileFormat);
+  if (st.sampleFrequency) {
+    const khz = (Number(st.sampleFrequency) / 1000);
+    parts.push(khz % 1 === 0 ? khz + ' kHz' : st.sampleFrequency + ' Hz');
+  }
+  if (st.bitRate) parts.push(st.bitRate + (st.fileFormat && st.fileFormat.toUpperCase() === 'DSD' ? ' bit' : ''));
+  infoEl.textContent = parts.join(' · ') || '—';
+  infoEl.style.display = parts.length ? 'block' : 'none';
+  $('playState').textContent = st.playStatus ? (PLAY_LABELS[st.playStatus] || st.playStatus) : '—';
+
+  // Icona play/pause allineata allo stato reale del dispositivo
+  // (per il CD lo stato arriva dal comando CST).
+  if (st.playStatus) {
+    playOptimistic = false;
+    updatePlayIcon(st.playStatus === 'play');
+  }
+
+  // Contatore tracce CD
+  const cdNumEl = $('cdTrackNum');
+  if (cdNumEl) cdNumEl.textContent = cdTrackNum ? String(cdTrackNum) : '—';
+
+  // Testi brano (ricerca su più fonti, mostra solo la prima trovata)
+  renderLyrics(st);
+
+  // Tracklist CD selezionata (se sorgente CD)
+  if (st.input === '23' && currentCdInfo) {
+    renderSelectedCd();
+  }
+
+  // Update track list if items are available.
+  // Don't overwrite a complete snapshot with a partial state push,
+  // but keep rendering everything else (volume, knobs, etc.).
+  if (st.listItems && Array.isArray(st.listItems) && st.listItems.length > 0) {
+    if (!(usbList.complete && st.listComplete !== true)) {
+      renderTrackList(st.listItems, st.listItems.length, st.listComplete === true);
+    }
+  }
+
+  // Play/pause toggle icon
+  setPlayStatus(st.playStatus);
+  const icon = $('playIcon');
+  if (st.playStatus === 'play') {
+    icon.innerHTML = '<path d="M7 5h3.4v14H7zm6.6 0H17v14h-3.4z"/>';
+  } else {
+    icon.innerHTML = '<path d="M8 5.5v13l11-6.5z"/>';
+  }
+
+  // Time / progress
+  updateTime(st.time);
+  renderProgress();
+
+  // Tone (mostra "--" se il dispositivo non ha ancora risposto a TFR QSTN)
+  if (st.bass !== null && st.bass !== undefined) {
+    syncKnob($('bassKnob'), st.bass);
+    $('bassVal').textContent = st.bass > 0 ? '+' + st.bass : String(st.bass);
+    $('bassVal').classList.toggle('nonzero', st.bass !== 0);
+  } else {
+    $('bassVal').textContent = '--';
+  }
+  if (st.treble !== null && st.treble !== undefined) {
+    syncKnob($('trebleKnob'), st.treble);
+    $('trebleVal').textContent = st.treble > 0 ? '+' + st.treble : String(st.treble);
+    $('trebleVal').classList.toggle('nonzero', st.treble !== 0);
+  } else {
+    $('trebleVal').textContent = '--';
+  }
+
+  // DAC · Digital Filter (DGF): 00 Slow, 01 Sharp, 02 Short
+  const dacFilter = st.digitalFilter || null;
+  document.querySelectorAll('.dac-option').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.dac === dacFilter);
+  });
+  const dacInfo = dacFilter ? (DAC_OPTIONS[dacFilter] || null) : null;
+  if ($('dacFilterValue')) $('dacFilterValue').textContent = dacInfo ? dacInfo.label : '—';
+  if ($('dacFilterHint')) {
+    $('dacFilterHint').textContent = dacInfo ? dacInfo.hint : 'Impostazione non disponibile.';
+  }
+
+  // Sleep / dimmer
+  if (st.sleep) {
+    if (['OFF', 'off'].includes(st.sleep)) $('sleepSel').value = 'off';
+  }
+  if (st.dimmer !== null && st.dimmer !== undefined) {
+    const map = { '00': '00', '01': '01', '02': '02', '08': '08' };
+    if (map[st.dimmer] && $('dimmerSel').value !== st.dimmer) $('dimmerSel').value = st.dimmer;
+  }
+
+  // Album art
+  updateArt(st);
+}
+
+// --- Commands ------------------------------------------------------------
+async function command(action, value, extra) {
+  try {
+    const res = await fetch('/api/command', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, value, ...(extra || {}) }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      toast((data.error || 'Errore') + (data.detail ? ' (' + data.detail + ')' : ''));
+      return null;
+    }
+    return data;
+  } catch (e) {
+    toast('Errore: ' + e.message);
+    return null;
+  }
+}
+
+// Power
+$('powerBtn').addEventListener('click', () => {
+  command('power', state && state.power === 'on' ? 'off' : 'on');
+});
+
+// Volume
+$('volSlider').addEventListener('input', () => {
+  $('volVal').textContent = $('volSlider').value;
+});
+$('volSlider').addEventListener('change', () => command('volume', Number($('volSlider').value)));
+$('volUp').addEventListener('click', () => command('volumeUp'));
+$('volDown').addEventListener('click', () => command('volumeDown'));
+$('muteBtn').addEventListener('click', () => command('mute'));
+
+// Playback
+let playOptimistic = false;
+$('playBtn').addEventListener('click', () => {
+  const playing = state && state.playStatus === 'play';
+  playOptimistic = !playing;
+  updatePlayIcon(playOptimistic);
+  command(playing ? 'pause' : 'play');
+});
+$('stopBtn').addEventListener('click', () => {
+  playOptimistic = false;
+  updatePlayIcon(false);
+  command('stop');
+});
+$('nextBtn').addEventListener('click', () => command('next'));
+$('prevBtn').addEventListener('click', () => command('prev'));
+
+// DAC · Digital Filter (aggiornamento ottimistico, poi conferma dallo stato)
+document.querySelectorAll('.dac-option').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    const value = btn.dataset.dac;
+    const info = DAC_OPTIONS[value];
+    document.querySelectorAll('.dac-option').forEach((b) => b.classList.toggle('active', b === btn));
+    $('dacFilterValue').textContent = info ? info.label : value;
+    $('dacFilterHint').textContent = info ? info.hint : '';
+    command('digitalFilter', value);
+  });
+});
+
+function updatePlayIcon(isPlaying) {
+  const icon = $('playIcon');
+  if (!icon) return;
+  if (isPlaying) {
+    icon.innerHTML = '<path d="M7 5h3.4v14H7zm6.6 0H17v14h-3.4z"/>';
+  } else {
+    icon.innerHTML = '<path d="M8 5.5v13l11-6.5z"/>';
+  }
+}
+
+// Tone knobs - drag handling
+let activeKnob = null;
+let activeKnobType = null;
+let activeKnobValue = 0;
+const KNOB_STEP = 1; // step in half-steps? actually step 2 for Pioneer
+
+function knobToValue(className) {
+  // map rotation to -10..+10, step 2
+  // 270 deg = full range, so 1 deg ≈ 20/270 ≈ 0.074
+  // We'll map manually based on drag distance
+  return activeKnobValue;
+}
+
+function syncKnob(element, value) {
+  // value is -10..+10 integer (step 2)
+  const min = -10, max = 10;
+  const pct = (value - min) / (max - min); // 0..1
+  const rotation = -135 + pct * 270; // -135..+135 degrees
+  
+  // Rotate the knob face
+  const face = element.querySelector('.knob-face');
+  if (face) face.style.transform = 'rotate(' + rotation + 'deg)';
+  
+  // Update knob-arc dasharray to show filled portion
+  const arc = element.querySelector('.knob-arc');
+  if (arc) {
+    const center = 37.5; // half of 75 (the arc length)
+    const frac = Math.abs(value) / 10;
+    const len = frac * 37.5;
+    let start;
+    if (value >= 0) {
+      start = 37.5;
+    } else {
+      start = 37.5 - len;
+    }
+    arc.style.strokeDasharray = len + ' 100';
+    arc.style.strokeDashoffset = -start;
+  }
+  
+  // Update dataset.value
+  element.dataset.value = value;
+  element.setAttribute('aria-valuenow', value);
+  
+  // Update the knob-val text
+  const vEl = element.querySelector('.knob-val');
+  if (vEl) {
+    vEl.textContent = value > 0 ? '+' + value : String(value);
+    vEl.classList.toggle('nonzero', value !== 0);
+  }
+}
+
+function startKnobDrag(e, knobEl, kind) {
+  activeKnob = knobEl;
+  activeKnobType = kind;
+  activeKnobValue = parseInt(knobEl.dataset.value || '0', 10) || 0;
+  e.preventDefault();
+  knobEl.classList.add('dragging');
+}
+
+function moveKnobDrag(e) {
+  if (!activeKnob) return;
+  const rect = activeKnob.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  // Map horizontal drag to value: left=-10, right=+10
+  const pct = Math.max(0, Math.min(1, (x - 10) / (rect.width - 20)));
+  // Round to even steps
+  let value = Math.round(-10 + pct * 20);
+  value = Math.round(value / 2) * 2; // step 2
+  value = Math.max(-10, Math.min(10, value));
+  
+  if (value !== activeKnobValue) {
+    activeKnobValue = value;
+    syncKnob(activeKnob, value);
+    if (activeKnobType === 'bass') {
+      command('bass', value);
+    } else {
+      command('treble', value);
+    }
+  }
+}
+
+function endKnobDrag() {
+  if (activeKnob) activeKnob.classList.remove('dragging');
+  activeKnob = null;
+  activeKnobType = null;
+}
+
+$('bassKnob').addEventListener('mousedown', (e) => startKnobDrag(e, $('bassKnob'), 'bass'));
+$('trebleKnob').addEventListener('mousedown', (e) => startKnobDrag(e, $('trebleKnob'), 'treble'));
+
+document.addEventListener('mousemove', moveKnobDrag);
+document.addEventListener('mouseup', endKnobDrag);
+$('bassKnob').addEventListener('touchstart', (e) => { e.preventDefault(); startKnobDrag(e.touches[0], $('bassKnob'), 'bass'); });
+$('trebleKnob').addEventListener('touchstart', (e) => { e.preventDefault(); startKnobDrag(e.touches[0], $('trebleKnob'), 'treble'); });
+document.addEventListener('touchmove', moveKnobDrag, { passive: false });
+document.addEventListener('touchend', endKnobDrag);
+
+// Wheel support for knobs
+$('bassKnob').addEventListener('wheel', (e) => {
+  e.preventDefault();
+  let v = parseInt($('bassKnob').dataset.value || '0', 10) || 0;
+  v = e.deltaY < 0 ? v + 2 : v - 2;
+  v = Math.max(-10, Math.min(10, v));
+  syncKnob($('bassKnob'), v);
+  command('bass', v);
+}, { passive: false });
+$('trebleKnob').addEventListener('wheel', (e) => {
+  e.preventDefault();
+  let v = parseInt($('trebleKnob').dataset.value || '0', 10) || 0;
+  v = e.deltaY < 0 ? v + 2 : v - 2;
+  v = Math.max(-10, Math.min(10, v));
+  syncKnob($('trebleKnob'), v);
+  command('treble', v);
+}, { passive: false });
+
+// Keyboard support for knobs
+$('bassKnob').addEventListener('keydown', (e) => {
+  let v = parseInt($('bassKnob').dataset.value || '0', 10) || 0;
+  if (e.key === 'ArrowUp' || e.key === 'ArrowRight') { v = Math.min(10, v + 2); e.preventDefault(); }
+  else if (e.key === 'ArrowDown' || e.key === 'ArrowLeft') { v = Math.max(-10, v - 2); e.preventDefault(); }
+  else if (e.key === 'Home') { v = -10; e.preventDefault(); }
+  else if (e.key === 'End') { v = 10; e.preventDefault(); }
+  else if (e.key === '0') { v = 0; e.preventDefault(); }
+  else return;
+  syncKnob($('bassKnob'), v);
+  command('bass', v);
+});
+$('trebleKnob').addEventListener('keydown', (e) => {
+  let v = parseInt($('trebleKnob').dataset.value || '0', 10) || 0;
+  if (e.key === 'ArrowUp' || e.key === 'ArrowRight') { v = Math.min(10, v + 2); e.preventDefault(); }
+  else if (e.key === 'ArrowDown' || e.key === 'ArrowLeft') { v = Math.max(-10, v - 2); e.preventDefault(); }
+  else if (e.key === 'Home') { v = -10; e.preventDefault(); }
+  else if (e.key === 'End') { v = 10; e.preventDefault(); }
+  else if (e.key === '0') { v = 0; e.preventDefault(); }
+  else return;
+  syncKnob($('trebleKnob'), v);
+  command('treble', v);
+});
+
+// Source chips
+$('sourcesGrid').addEventListener('click', (e) => {
+  const chip = e.target.closest('.chip');
+  if (chip && !chip.disabled) {
+    command('input', chip.dataset.input).then(() => {
+      // Refresh list after input change
+      if (chip.dataset.input === '2A' || chip.dataset.input === '2B' || chip.dataset.input === '2C') {
+        setTimeout(refreshList, 1500);
+      }
+    });
+  }
+});
+
+// --- Diagnostics ---------------------------------------------------------
+async function runDiag() {
+  $('diagOut').textContent = 'Test in corso…';
+  try {
+    const r = await fetch('/api/diag');
+    const d = await r.json();
+    const line = (label, res) => {
+      const ms = res && res.ms !== undefined ? ' (' + res.ms + ' ms)' : '';
+      const ok = res && res.ok;
+      return ok
+        ? `<div><span>${label}</span><span class="ok">OK${ms}</span></div>`
+        : `<div><span>${label}</span><span class="bad">${(res && res.error) || 'fail'}${ms}</span></div>`;
+    };
+    let html = '';
+    html += line('eISCP TCP 60128', d.tcp60128);
+    html += line('Web UI HTTP 8080', d.http8080);
+    html += line('AirPlay TCP 5000', d.airplay5000);
+    if (d.gatewayTest) html += line('Gateway ' + d.gateway, d.gatewayTest);
+
+    if (d.analysis) {
+      const cls = d.analysis.level === 'ok' ? 'ok'
+        : d.analysis.level === 'permission' ? 'warnc'
+        : d.analysis.level === 'unreachable' ? 'warnc' : 'bad';
+      html += `<div class="${cls}" style="margin-top:8px"><span><b>Diagnosi</b></span><span>${d.analysis.message}</span></div>`;
+    }
+
+    if (!d.tcp60128.ok) {
+      if (d.tcp60128.error === 'ECONNREFUSED') {
+        html += '<div class="warnc"><span>Nota</span><span>Host raggiungibile ma porta 60128 chiusa: eISCP disabilitato o firmware in standby.</span></div>';
+      } else if (d.tcp60128.error === 'ETIMEDOUT') {
+        html += '<div class="warnc"><span>Nota</span><span>Timeout: IP errato, firewall o diversa subnet.</span></div>';
+      }
+      html += '<div class="hint">Se il server è stato avviato da Cursor/VS Code/Terminale e ottieni <code>EHOSTUNREACH</code>, su macOS 15+ manca il permesso <b>Rete locale</b> per quell\'app: usa <code>./launch.sh</code> (avvia il server via launchd) oppure abilita l\'app in <i>Impostazioni di Sistema → Privacy e sicurezza → Rete locale</i>.</div>';
+    } else {
+      html += '<div class="ok"><span>Stato</span><span>Porta eISCP raggiungibile: i comandi funzionano.</span></div>';
+    }
+    $('diagOut').innerHTML = html;
+  } catch (e) {
+    $('diagOut').textContent = 'Errore diagnostica: ' + e.message;
+  }
+}
+
+$('diagBtn').addEventListener('click', runDiag);
+
+$('saveHost').addEventListener('click', async () => {
+  const host = $('hostInput').value.trim();
+  if (!host) return;
+  await fetch('/api/host', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ host }),
+  });
+  toast('IP salvato: ' + host);
+});
+
+$('wolBtn').addEventListener('click', async () => {
+  await fetch('/api/wol', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+  toast('Magic packet inviato');
+});
+
+// --- Live updates via SSE ------------------------------------------------
+function connectEvents() {
+  const es = new EventSource('/api/events');
+  es.addEventListener('status', (e) => renderStatus(JSON.parse(e.data)));
+  es.addEventListener('state', (e) => renderState(JSON.parse(e.data)));
+  es.addEventListener('log', (e) => {
+    const l = JSON.parse(e.data);
+    const el = $('log');
+    el.textContent += `${new Date(l.t).toLocaleTimeString()} ${l.dir} ${l.text}\n`;
+    el.scrollTop = el.scrollHeight;
+  });
+  es.addEventListener('nla', (e) => {
+    const data = JSON.parse(e.data);
+    if (!Array.isArray(data.items)) return;
+    const loaded = data.items.filter(i => i && i.title).length;
+    console.log('[nla] items=', data.items.length, 'loaded=', loaded,
+      'total=', data.total, 'complete=', data.complete);
+    usbList = {
+      items: data.items,
+      total: data.total || data.items.length,
+      complete: data.complete === undefined ? false : data.complete,
+    };
+    renderTrackList(usbList.items, usbList.total, usbList.complete);
+  });
+  es.onerror = () => {
+    es.close();
+    setTimeout(connectEvents, 2500);
+  };
+}
+
+
+// --- Pannello sinistro: tracklist USB o CD --------------------------------
+function isCdMode() {
+  return !!(state && state.input === '23');
+}
+
+// Cambia intestazione, controlli e contenuto del pannello sinistro in base
+// alla sorgente attiva. Il contenuto USB resta in `usbList` e viene
+// ripristinato quando si torna su USB/NET.
+function syncListMode() {
+  const cd = isCdMode();
+  const mode = cd ? 'cd' : 'usb';
+  if (listMode !== mode) {
+    listMode = mode;
+    const title = $('listTitle');
+    if (title) title.textContent = cd ? 'CD Tracklist' : 'USB Tracklist';
+    ['listUpBtn', 'listDownBtn', 'listRefreshBtn'].forEach((id) => {
+      const el = $(id);
+      if (el) el.style.display = cd ? 'none' : '';
+    });
+    const back = $('listBackBtn');
+    if (back && cd) back.style.display = 'none';
+    const input = $('listSearch');
+    if (input) {
+      input.value = cd ? cdSearchTerm : searchTerm;
+      input.placeholder = cd ? 'cerca traccia' : 'cerca artista';
+    }
+    const clear = $('listSearchClear');
+    if (clear) clear.style.display = (cd ? cdSearchTerm : searchTerm) ? 'inline-block' : 'none';
+    if (!cd) {
+      // Se lo snapshot `usbList` non è ancora arrivato, usa la lista
+      // contenuta nell'ultimo stato del dispositivo: così tornando da CD
+      // non si perde il contenuto USB già visibile.
+      const hasSnapshot = usbList.items && usbList.items.length > 0;
+      const items = hasSnapshot
+        ? usbList.items
+        : ((state && Array.isArray(state.listItems)) ? state.listItems : []);
+      const total = hasSnapshot ? usbList.total : items.length;
+      const complete = hasSnapshot ? usbList.complete : !!(state && state.listComplete === true);
+      renderTrackList(items, total, complete);
+      // Se la lista non è completa il server la sta ricaricando (watchdog):
+      // avvia/riprendi il polling dello snapshot per mostrarla appena arriva.
+      if (!complete && !snapshotTimer) {
+        if (!snapshotStartedAt) snapshotStartedAt = Date.now();
+        fetchSnapshot();
+      }
+    }
+  }
+  if (cd) renderCdTrackList();
+}
+
+function renderCdTrackList() {
+  const container = $('listPanel');
+  if (!container) return;
+  const tracks = currentCdInfo && Array.isArray(currentCdInfo.tracks) ? currentCdInfo.tracks : [];
+  const term = (cdSearchTerm || '').trim().toLowerCase();
+  let filtered = tracks;
+  if (term) {
+    filtered = tracks.filter((t) => {
+      const haystack = ((t.title || '') + ' ' + ((currentCdInfo && currentCdInfo.artist) || '')).toLowerCase();
+      return haystack.includes(term);
+    });
+  }
+  const countEl = $('listSearchCount');
+  if (countEl) {
+    if (term) {
+      countEl.textContent = `${filtered.length} di ${tracks.length} risultato${filtered.length !== 1 ? 'i' : ''}`;
+      countEl.style.display = 'block';
+    } else {
+      countEl.style.display = 'none';
+    }
+  }
+  if (!tracks.length) {
+    container.innerHTML = `<div class="list-empty">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.5"/>
+      </svg>
+      <div>Nessuna tracklist CD selezionata.<br>Usa il pannello “Info CD (MusicBrainz)” per cercare e selezionare una release.</div>
+    </div>`;
+    container.style.display = 'block';
+    return;
+  }
+  if (!filtered.length) {
+    container.innerHTML = `<div class="list-empty"><div>Nessun risultato per “${esc(term)}”</div></div>`;
+    container.style.display = 'block';
+    return;
+  }
+  // Evidenzia la traccia corrente solo se il contatore CD è noto.
+  const currentIdx = state && state.cdTrackKnown ? state.cdTrack : null;
+  container.innerHTML = filtered.map((t) => {
+    const isCurrent = currentIdx === t.index;
+    return `<div class="track-item${isCurrent ? ' playing' : ''}" data-cd-track="${t.index}" tabindex="0" role="button"
+      title="Allinea il contatore CD a questa traccia" aria-label="Traccia ${t.index}: ${esc(t.title)}">
+      <span class="track-num">${t.index}</span>
+      <span class="track-title">${esc(t.title)}</span>
+      <span class="track-dur">${esc(t.duration || '')}</span>
+    </div>`;
+  }).join('');
+  container.style.display = 'block';
+  container.querySelectorAll('[data-cd-track]').forEach((el) => {
+    const select = () => cdSelectTrack(Number(el.dataset.cdTrack));
+    el.addEventListener('click', select);
+    el.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); select(); }
+    });
+  });
+}
+
+// Il lettore CD non supporta il salto diretto a una traccia: cliccando una
+// voce si allinea solo il contatore tenuto dal controller (cdTrack).
+function cdSelectTrack(n) {
+  if (!n) return;
+  fetch('/api/cd/track', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ value: n }),
+  }).then((r) => r.json()).then(() => {
+    if (state) { state.cdTrack = n; state.cdTrackKnown = true; }
+    renderCdTrackList();
+    renderSelectedCd();
+    toast('Contatore CD allineato alla traccia ' + n);
+  }).catch(() => toast('Errore allineamento traccia CD'));
+}
+
+function renderTrackList(items, total, complete) {
+  // In sorgente CD il pannello sinistro mostra la tracklist MusicBrainz:
+  // gli aggiornamenti della lista USB non devono sovrascriverla.
+  if (isCdMode()) { renderCdTrackList(); return; }
+  const container = $("listPanel");
+  if (!container) return;
+
+  // Difesa: assicura che items sia sempre un array
+  if (!Array.isArray(items)) items = [];
+
+  // Applica filtro di ricerca (case-insensitive su titolo e artista se disponibile)
+  const term = (searchTerm || '').trim().toLowerCase();
+  let filtered = items;
+  if (term) {
+    filtered = items.filter((item) => {
+      if (!item) return false;
+      const haystack = ((item.title || '') + ' ' + (item.artist || '')).toLowerCase();
+      return haystack.includes(term);
+    });
+  }
+
+  // Aggiorna contatore risultati ricerca
+  const countEl = $("listSearchCount");
+  if (countEl) {
+    if (term) {
+      countEl.textContent = `${filtered.length} di ${items.length} risultato${filtered.length !== 1 ? 'i' : ''}`;
+      countEl.style.display = 'block';
+    } else {
+      countEl.style.display = 'none';
+    }
+  }
+
+  // Show back button if we have items (meaning we're in a subfolder)
+  const backBtn = $("listBackBtn");
+  if (backBtn) {
+    // Show back button if we're not at the top level
+    // The top level has "Music" as the only item
+    const isTopLevel = filtered && filtered.length === 1 && filtered[0] && filtered[0].title === "Music";
+    backBtn.style.display = isTopLevel ? "none" : "block";
+  }
+  
+  // Still loading: non mostrare una lista parziale come se fosse quella
+  // definitiva. Il dispositivo all'avvio invia solo poche righe NLS (es. 4)
+  // e la lista completa arriva con NLA: finché non è completa mostriamo lo
+  // stato di caricamento, e solo dopo il timeout il parziale raccolto.
+  if (!complete) {
+    const loaded = items && items.filter(i => i && i.title).length || 0;
+    const notStarted = !snapshotStartedAt;
+    const waitingTooLong = !notStarted && Date.now() - snapshotStartedAt > SNAPSHOT_TIMEOUT_MS;
+    if (!waitingTooLong) {
+      container.innerHTML = `<div class="list-empty">
+        <div>${notStarted ? "Premi ↻ per caricare la lista USB" : `Caricamento lista USB… (${loaded}/${total || '?'})`}</div>
+      </div>`;
+      container.style.display = "block";
+      return;
+    }
+    // Timeout: mostra quello che abbiamo (anche se parziale).
+    if (loaded === 0) {
+      container.innerHTML = `<div class="list-empty">
+        <div>Lista USB vuota o dispositivo non risponde</div>
+      </div>`;
+      container.style.display = "block";
+      return;
+    }
+  }
+  
+  if (filtered && filtered.length > 0) {
+    // Filter out empty/placeholder items
+    const validItems = filtered.filter(item => item && item.title && item.title.trim() && item.title !== "None" && item.title !== "");
+    let html = "";
+    
+    validItems.forEach((item, idx) => {
+      const title = item.title || "Unknown";
+      const isFolder = item.iconid === "29" || item.iconid === "HS01" || item.icontype === "F";
+      const isPlaying = item.iconid === "36";
+      const cls = isPlaying ? " playing" : "";
+      const icon = isFolder ? "📁" : "🎵";
+      
+      if (isFolder) {
+        html += `<div class="track-item track-item-folder${cls}" data-index="${idx}" data-id="${item.id}" data-folder="1" tabindex="0" role="button" aria-label="Apri cartella ${esc(title)}">
+          <span class="track-num">${icon}</span>
+          <span class="track-title">${esc(title)}</span>
+        </div>`;
+      } else {
+        html += `<div class="track-item${cls}" data-index="${idx}" data-id="${item.id}" data-folder="0" tabindex="0" role="button" aria-label="Play ${esc(title)}">
+          <span class="track-num">${idx + 1}</span>
+          <span class="track-title">${esc(title)}</span>
+        </div>`;
+      }
+    });
+    
+    container.innerHTML = html;
+    
+    // Add click handlers
+    container.querySelectorAll(".track-item").forEach((el) => {
+      el.addEventListener("click", () => {
+        const isFolder = el.dataset.folder === "1";
+        const itemId = el.dataset.id;
+        if (isFolder) {
+          enterFolder(itemId);
+        } else {
+          const idx = parseInt(el.dataset.index);
+          playTrackFromList(idx);
+        }
+      });
+    });
+    container.style.display = "block";
+  } else {
+    let emptyMsg = "Nessuna traccia disponibile";
+    if (term) {
+      emptyMsg = `Nessun risultato per “${esc(term)}”`;
+    } else if (total === 0) {
+      emptyMsg = "Lista USB vuota o dispositivo non risponde";
+    }
+    container.innerHTML = `<div class="list-empty">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M9 18V5l12-2v13"/>
+        <circle cx="6" cy="18" r="3"/>
+        <circle cx="18" cy="16" r="3"/>
+      </svg>
+      <div>${emptyMsg}</div>
+    </div>`;
+    container.style.display = "block";
+  }
+}
+
+function enterFolder(folderId) {
+  fetch('/api/list/select', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id: folderId }),
+  }).then((r) => r.json()).then(() => {
+    // La lista verrà aggiornata automaticamente via SSE dal dispositivo
+  }).catch((e) => {
+    toast("Errore cartella: " + e.message);
+  });
+}
+
+function playTrackFromList(index) {
+  if (!state || !state.listItems) return;
+  const validItems = state.listItems.filter(item => item && item.title && item.title.trim() && item.title !== "None" && item.title !== "");
+  if (index >= validItems.length) return;
+  const track = validItems[index];
+  if (track && track.title) {
+    // Send NLA selection command to device
+    fetch('/api/list/select', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: track.id }),
+    }).then((r) => r.json()).then((data) => {
+      toast("Passaggio a: " + track.title);
+    }).catch((e) => {
+      toast("Errore: " + e.message);
+    });
+  }
+}
+
+function esc(s) {
+  const map = { '&': '&', '<': '<', '>': '>', '"': '"', "'": "'" };
+  return String(s).replace(/[&<>"']/g, (c) => map[c]);
+}
+function fetchSnapshot() {
+  if (snapshotTimer) clearTimeout(snapshotTimer);
+  const elapsed = Date.now() - snapshotStartedAt;
+  if (elapsed > SNAPSHOT_TIMEOUT_MS) {
+    // Timeout reached: show whatever we have, even if not marked complete.
+    renderTrackList(usbList.items, usbList.total, true);
+    return;
+  }
+  fetch('/api/list/snapshot')
+    .then((r) => r.json())
+    .then((data) => {
+      usbList = {
+        items: data.items || [],
+        total: data.total || 0,
+        complete: data.complete === undefined ? false : data.complete,
+      };
+      renderTrackList(usbList.items, usbList.total, usbList.complete);
+      if (!usbList.complete) {
+        snapshotTimer = setTimeout(fetchSnapshot, 400);
+      }
+    })
+    .catch((e) => {
+      snapshotTimer = setTimeout(fetchSnapshot, 800);
+    });
+}
+
+function refreshList() {
+  if (snapshotTimer) clearTimeout(snapshotTimer);
+  snapshotStartedAt = Date.now();
+  $("listPanel").innerHTML = `<div class="list-empty"><div>Caricamento lista USB…</div></div>`;
+  $("listPanel").style.display = "block";
+  fetch('/api/list/refresh', { method: 'POST' })
+    .then((r) => r.json())
+    .then(() => {
+      fetchSnapshot();
+    })
+    .catch((e) => {
+      toast("Errore aggiornamento: " + e.message);
+    });
+}
+
+function listUp() {
+  fetch('/api/list/up', { method: 'POST' })
+    .then((r) => r.json())
+    .then(() => {
+      toast("Su");
+      snapshotStartedAt = Date.now();
+      setTimeout(fetchSnapshot, 600);
+    })
+    .catch((e) => {
+      toast("Errore: " + e.message);
+    });
+}
+
+function listDown() {
+  fetch('/api/list/down', { method: 'POST' })
+    .then((r) => r.json())
+    .then(() => {
+      toast("Giù");
+      snapshotStartedAt = Date.now();
+      setTimeout(fetchSnapshot, 600);
+    })
+    .catch((e) => {
+      toast("Errore: " + e.message);
+    });
+}
+
+function goBack() {
+  fetch('/api/list/back', { method: 'POST' })
+    .then((r) => r.json())
+    .then(() => {
+      toast("Tornato indietro");
+      snapshotStartedAt = Date.now();
+      setTimeout(fetchSnapshot, 600);
+    })
+    .catch((e) => {
+      toast("Errore: " + e.message);
+    });
+}
+
+let toneChecked = false;
+
+function ensureToneValues() {
+  if (toneChecked) return;
+  const b = $('bassVal').textContent;
+  const t = $('trebleVal').textContent;
+  if (b === '--' || t === '--') {
+    // Il dispositivo non ha ancora inviato TFR: forziamo una query
+    fetch('/api/command', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'raw', code: 'TFR', param: 'QSTN' }),
+    }).catch(() => {});
+    setTimeout(ensureToneValues, 1500);
+  } else {
+    toneChecked = true;
+  }
+}
+
+async function init() {
+  initArtHandlers();
+  showCoverPlaceholder();
+  const snapshot = new URLSearchParams(location.search).has('snapshot');
+  try {
+    const r = await fetch('/api/state');
+    const d = await r.json();
+    inputs = d.inputs || {};
+    sourceGroups = d.sourceGroups || [];
+    renderStatus(d.status);
+    renderState(d.state);
+    // La lista USB/NET completa viene caricata dal server all'avvio e ad ogni
+    // riconnessione (NLA + watchdog). Il browser si limita a seguirne lo
+    // stato tramite `/api/list/snapshot` (avviato da syncListMode).
+  } catch (e) {
+    toast('Impossibile contattare il server locale');
+  }
+  if (!snapshot) {
+    connectEvents();
+    runDiag();
+  }
+  setTimeout(ensureToneValues, 2000);
+}
+
+init()
+// Testi canzone
+$('lyricsToggle').addEventListener('click', toggleLyrics);
+
+// List up/down buttons
+$("listUpBtn").addEventListener("click", listUp);
+$("listDownBtn").addEventListener("click", listDown);
+// List refresh button
+$("listRefreshBtn").addEventListener("click", refreshList);
+// List back button
+$("listBackBtn").addEventListener("click", goBack);
+// List search
+const listSearch = $("listSearch");
+const listSearchClear = $("listSearchClear");
+if (listSearch) {
+  const applyListSearch = (value) => {
+    if (isCdMode()) {
+      cdSearchTerm = value;
+      renderCdTrackList();
+    } else {
+      searchTerm = value;
+      renderTrackList(usbList.items, usbList.total, usbList.complete);
+    }
+    listSearchClear.style.display = value ? "inline-block" : "none";
+  };
+  listSearch.addEventListener("input", (e) => applyListSearch(e.target.value || ""));
+  listSearchClear.addEventListener("click", () => {
+    listSearch.value = "";
+    applyListSearch("");
+  });
+}
+
+// --- Info CD (MusicBrainz) -------------------------------------------------
+const cdDiscId = $("cdDiscId");
+const cdArtist = $("cdArtist");
+const cdAlbum = $("cdAlbum");
+const cdLookupBtn = $("cdLookupBtn");
+const cdResult = $("cdResult");
+
+if (cdLookupBtn) {
+  cdLookupBtn.addEventListener("click", async () => {
+    const discid = (cdDiscId.value || "").trim();
+    const artist = (cdArtist.value || "").trim();
+    const album = (cdAlbum.value || "").trim();
+    if (!cdResult) return;
+    cdResult.innerHTML = '<div style="color:var(--muted)">Ricerca in corso…</div>';
+
+    try {
+      let data;
+      if (discid) {
+        const r = await fetch("/api/cd/lookup?discid=" + encodeURIComponent(discid));
+        data = await r.json();
+      } else if (artist || album) {
+        const r = await fetch(
+          "/api/cd/search?artist=" + encodeURIComponent(artist) + "&album=" + encodeURIComponent(album)
+        );
+        data = await r.json();
+      } else {
+        cdResult.innerHTML = '<div style="color:var(--err)">Inserisci Disc ID oppure Artista e/o Titolo disco</div>';
+        return;
+      }
+      renderCdResult(data);
+    } catch (e) {
+      cdResult.innerHTML = '<div style="color:var(--err)">Errore: ' + e.message + "</div>";
+    }
+  });
+}
+
+function renderCdResult(data) {
+  if (!cdResult) return;
+  if (!data) {
+    cdResult.innerHTML = '<div style="color:var(--muted-2)">Nessun risultato</div>';
+    return;
+  }
+
+  const releasesRaw = data.releases || data.release || [];
+  const releases = Array.isArray(releasesRaw) ? releasesRaw : [releasesRaw];
+  lastCdReleases = releases;
+  if (!releases.length) {
+    cdResult.innerHTML = '<div style="color:var(--muted-2)">Nessuna release trovata</div>';
+    return;
+  }
+
+  let html = "";
+  releases.forEach((rel) => {
+    const title = rel.title || "Senza titolo";
+    let artist = "Sconosciuto";
+    if (rel["artist-credit"]) {
+      artist = rel["artist-credit"]
+        .map((ac) => ac.name || (ac.artist && ac.artist.name) || "")
+        .join(", ");
+    } else if (rel.artist) {
+      artist = rel.artist.name || rel.artist;
+    }
+    const date = rel.date || "";
+    const label =
+      rel["label-info"] && rel["label-info"][0] && rel["label-info"][0].label
+        ? rel["label-info"][0].label.name
+        : "";
+    const media = rel.media || [];
+    const tracks = media[0] && Array.isArray(media[0].tracks) ? media[0].tracks : [];
+    // La ricerca non contiene i titoli delle tracce: si mostra il conteggio
+    // (l'elenco completo viene scaricato alla selezione della release).
+    const trackCount = tracks.length || parseInt(rel["track-count"], 10) || 0;
+
+    html += `<div class="cd-release">
+      <div class="cd-release-title">${esc(title)}</div>
+      <div class="cd-release-meta">${esc(artist)} ${date ? "· " + date : ""} ${
+      label ? "· " + esc(label) : ""
+    }${trackCount ? " · " + trackCount + " tracce" : ""}</div>`;
+    html += `<button class="cd-select-btn" data-release-id="${rel.id || ''}">Usa questa tracklist</button>`;
+    if (tracks.length) {
+      html += '<div style="margin-top:6px">';
+      tracks.forEach((t, i) => {
+        const dur = t.length ? fmtMs(t.length) : "";
+        html += `<div class="cd-track">
+          <span class="cd-track-num">${i + 1}.</span>
+          <span class="cd-track-title">${esc(t.title || "")}</span>
+          <span class="cd-track-dur">${dur}</span>
+        </div>`;
+      });
+      html += "</div>";
+    }
+    html += "</div>";
+  });
+  cdResult.innerHTML = html;
+}
+
+function fmtMs(ms) {
+  const s = Math.floor(ms / 1000);
+  const m = Math.floor(s / 60);
+  const sec = s % 60;
+  return m + ":" + String(sec).padStart(2, "0");
+}
+
+// --- Selezione tracklist CD ------------------------------------------------
+if (cdResult) {
+  cdResult.addEventListener("click", (e) => {
+    const btn = e.target.closest(".cd-select-btn");
+    if (!btn) return;
+    const releaseId = btn.dataset.releaseId;
+    const rel = lastCdReleases.find(r => (r.id || '') === releaseId);
+    if (rel) selectCdRelease(rel);
+  });
+}
+
+// --- Allineamento contatore tracce CD ---------------------------------------
+// Il ricevitore non comunica il numero di traccia del CD via eISCP: se la skip
+// è stata data con il telecomando del dispositivo, i pulsanti ± permettono di
+// riallineare il contatore a ciò che mostra il display del ricevitore.
+function adjustCdTrack(delta) {
+  fetch("/api/cd/track", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ delta })
+  })
+    .then(r => r.json())
+    .then((data) => {
+      if (data && data.ok) toast("Traccia CD: " + data.cdTrack);
+    })
+    .catch(e => toast("Errore: " + e.message));
+}
+
+const cdTrackPrevBtn = $("cdTrackPrev");
+const cdTrackNextBtn = $("cdTrackNext");
+if (cdTrackPrevBtn) cdTrackPrevBtn.addEventListener("click", () => adjustCdTrack(-1));
+if (cdTrackNextBtn) cdTrackNextBtn.addEventListener("click", () => adjustCdTrack(1));
+
+function selectCdRelease(rel) {
+  const releaseId = rel.id || "";
+  const media = rel.media || [];
+  const tracks = media[0] && Array.isArray(media[0].tracks) ? media[0].tracks : [];
+
+  // La ricerca MusicBrainz restituisce "media" ma non l'elenco delle tracce:
+  // in quel caso va richiesto il dettaglio della release (inc=recordings).
+  if (!tracks.length && releaseId) {
+    toast("Caricamento tracklist…");
+    fetch("/api/cd/release?id=" + encodeURIComponent(releaseId))
+      .then((r) => r.json())
+      .then((full) => {
+        if (!full || !full.id) {
+          toast("Tracklist non disponibile per questa release");
+          return;
+        }
+        applyCdRelease(full);
+      })
+      .catch((e) => toast("Errore: " + e.message));
+    return;
+  }
+
+  applyCdRelease(rel);
+}
+
+function applyCdRelease(rel) {
+  const title = rel.title || "Senza titolo";
+  let artist = "Sconosciuto";
+  if (rel["artist-credit"]) {
+    artist = rel["artist-credit"]
+      .map((ac) => ac.name || (ac.artist && ac.artist.name) || "")
+      .join(", ");
+  } else if (rel.artist) {
+    artist = rel.artist.name || rel.artist;
+  }
+  const date = rel.date || "";
+  const media = rel.media || [];
+  const tracks = media[0] && Array.isArray(media[0].tracks) ? media[0].tracks : [];
+
+  currentCdInfo = {
+    id: rel.id,
+    title,
+    artist,
+    date,
+    tracks: tracks.map((t, i) => ({
+      index: i + 1,
+      title: t.title || "Traccia sconosciuta",
+      duration: t.length ? fmtMs(t.length) : "",
+      durationMs: Number(t.length) || 0
+    }))
+  };
+
+  renderSelectedCd();
+  // Aggiorna subito anche il pannello sinistro se è in modalità CD.
+  if (isCdMode()) renderCdTrackList();
+
+  // Informazioni sulla disponibilità dell'avanzamento automatico: il
+  // ricevitore non comunica il numero di traccia, quindi il contatore
+  // avanza usando le durate pubblicate da MusicBrainz.
+  const noteEl = $("cdDurationNote");
+  if (noteEl) {
+    const total = currentCdInfo.tracks.length;
+    const withDur = currentCdInfo.tracks.filter((t) => t.durationMs > 0).length;
+    if (!total || !withDur) {
+      noteEl.className = "cd-duration-note warn";
+      noteEl.textContent = "MusicBrainz non pubblica la durata delle tracce per questa release: " +
+        "l'avanzamento automatico non è disponibile. Usa ± per riallineare il contatore al display del ricevitore.";
+    } else if (withDur < total) {
+      noteEl.className = "cd-duration-note warn";
+      noteEl.textContent = "Avanzamento automatico attivo con stima per " + (total - withDur) +
+        " tracce senza durata (MusicBrainz le pubblica a volte). Il contatore può discostarsi dal display del ricevitore.";
+    } else {
+      noteEl.className = "cd-duration-note";
+      noteEl.textContent = "Avanzamento automatico attivo: il contatore segue le durate di MusicBrainz " +
+        "(stima, il ricevitore non comunica la traccia del CD).";
+    }
+  }
+
+  // Invia al server le durate delle tracce: il ricevitore non comunica il
+  // numero di traccia del CD, quindi il controller usa questi dati (insieme
+  // allo stato play/pause da CST) per avanzare il contatore da solo.
+  fetch("/api/cd/tracklist", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      tracks: currentCdInfo.tracks.map((t) => ({ index: t.index, durationMs: t.durationMs }))
+    })
+  }).catch(() => {});
+
+  // Rilancia subito la ricerca del testo: con il CD artista/titolo arrivano
+  // dalla tracklist appena selezionata, non serve attendere il prossimo stato.
+  if (state) renderLyrics(state);
+
+  cdResult.querySelectorAll(".cd-select-btn").forEach((b) => {
+    const isSel = (b.dataset.releaseId || '') === (rel.id || '');
+    b.classList.toggle("selected", isSel);
+    b.textContent = isSel ? "✓ Selezionata" : "Usa questa tracklist";
+  });
+
+  toast("Tracklist CD selezionata: " + title);
+}
+
+function renderSelectedCd() {
+  const panel = $("cdSelectedPanel");
+  const metaEl = $("cdSelectedMeta");
+  const tracksEl = $("cdSelectedTracks");
+  if (!panel || !currentCdInfo) return;
+  panel.classList.add("show");
+  if (metaEl) {
+    metaEl.textContent = `${esc(currentCdInfo.artist)} · ${esc(currentCdInfo.title)} ${currentCdInfo.date ? "· " + currentCdInfo.date : ""}`;
+  }
+  if (!tracksEl) return;
+
+  let html = "";
+  if (currentCdInfo.tracks && currentCdInfo.tracks.length) {
+    // In sorgente CD la traccia corrente arriva da cdTrack (contatore locale);
+    // per le altre sorgenti si usa la traccia NET/USB (NTR).
+    const currentIdx = state && state.input === '23'
+      ? (state.cdTrackKnown ? state.cdTrack : null)
+      : (state ? state.track : null);
+    currentCdInfo.tracks.forEach((t) => {
+      const isCurrent = currentIdx === t.index;
+      html += `<div class="cd-selected-track${isCurrent ? ' current' : ''}" data-track-index="${t.index}">
+        <span class="cd-selected-track-num">${t.index}.</span>
+        <span class="cd-selected-track-title">${esc(t.title)}</span>
+        <span class="cd-selected-track-dur">${t.duration}</span>
+      </div>`;
+    });
+  } else {
+    html = '<div style="color:var(--muted-2)">Nessuna traccia disponibile</div>';
+  }
+  tracksEl.innerHTML = html;
+}
+;
+
+  </script>
+</body>
+</html>

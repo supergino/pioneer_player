@@ -1,0 +1,24 @@
+# Dipendenze
+node_modules/
+
+# Log di runtime
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# macOS
+.DS_Store
+
+# Variabili d'ambiente locali
+.env
+.env.local
+
+# Cache e build
+.cache/
+dist/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
