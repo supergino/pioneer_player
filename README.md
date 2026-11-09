@@ -13,7 +13,7 @@
 
 > Control volume, sources, playback, tones, CD track info and USB/NET tracklists from any browser on your local network — no app install required.
 >
-> 🟡 **Versione in Beta** — il progetto è in sviluppo attivo: vengono aggiunte funzionalità e correzioni di bug regolarmente.
+> 🟡 **Beta Version** — the project is under active development: features and bug fixes are added regularly.
 
 </div>
 
@@ -190,7 +190,7 @@ HTTP_PORT=3100 node server.js
 
 ### Conventions
 - CommonJS, `'use strict'`, `const`/`let` (no `var`).
-- Comments in Italian (project is Italian).
+- Comments in English.
 - `client.state` is the single source of truth for the device.
 - `renderState(st)` must not contain early `return`s that skip knob/volume updates.
 
