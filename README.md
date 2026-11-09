@@ -9,8 +9,11 @@
 [![License](https://img.shields.io/badge/License-MIT-D9AB5B)](#-license)
 [![Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey)](#)
 [![Protocol](https://img.shields.io/badge/Protocol-eISCP%20TCP%2060128-D9AB5B)](#)
+[![Status](https://img.shields.io/badge/Status-Beta-blueviolet)](https://github.com/supergino/pioneer_player)
 
 > Control volume, sources, playback, tones, CD track info and USB/NET tracklists from any browser on your local network — no app install required.
+>
+> 🟡 **Versione in Beta** — il progetto è in sviluppo attivo: vengono aggiunte funzionalità e correzioni di bug regolarmente.
 
 </div>
 
@@ -35,8 +38,6 @@
 ## 📸 Screenshot
 
 ![App screenshot](docs/screenshot.png)
-
-> _Tip: copy your screenshot to `docs/screenshot.png` to display it here._
 
 ---
 
