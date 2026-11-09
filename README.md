@@ -35,6 +35,23 @@
 
 ---
 
+## 🏆 Unique Features — Not Available in Other Players
+
+Unlike any other remote or controller for Pioneer/Onkyo receivers, this project implements features that are **not available elsewhere**:
+
+### 🎤 Integrated lyrics search — for USB files AND CD
+- Lyrics lookup works for tracks played from **USB** and **NET** sources.
+- **Also works for CD Audio**: since the Pioneer HM86D does not send CD track metadata over eISCP, this app retrieves the current track title and artist from the selected **MusicBrainz release** and searches lyrics automatically.
+- No other eISCP controller provides integrated lyrics for CD playback.
+
+### 💿 CD track number management — exclusive to this project
+- The HM86D does **not report the current CD track number** over eISCP, and standard remote controls cannot fix it if it drifts.
+- This app keeps a **virtual track counter** (`cdTrack`) and lets you realign it with **± buttons** (`/api/cd/track`).
+- Combined with MusicBrainz track durations, the counter advances automatically during playback and freezes on pause.
+- **No other player or remote offers this capability** for the built-in CD player.
+
+---
+
 ## 📸 Screenshot
 
 ![App screenshot](docs/screenshot.png)
@@ -46,7 +63,7 @@
 ```
 ┌────────────┐   HTTP/SSE    ┌──────────────┐   TCP/eISCP    ┌─────────────────┐
 │  Browser   │ ◄───────────► │  server.js   │ ◄────────────► │  Pioneer HM86D  │
-│ (index.html)│               │  (Express)   │   port 60128   │  (receiver)     │
+│ index.html)│               │  (Express)   │   port 60128   │  (receiver)     │
 └────────────┘               └──────┬───────┘                └─────────────────┘
                                    │
                                    └── eiscp.js  (TCP client, state, polling)
