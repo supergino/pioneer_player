@@ -228,6 +228,26 @@ Please read [`AGENTS.md`](AGENTS.md) before submitting changes — it documents 
 
 ---
 
+## 🙏 Acknowledgments
+
+This project was developed by studying and referencing the following open-source projects that implement or document the eISCP / ISCP protocol for Pioneer, Onkyo and Integra receivers. They were used as reference for command codes, protocol framing and message parsing; no source code was copied verbatim from them.
+
+| Project | Language | Role |
+|---|---|---|
+| [mkulesh/onpc](https://github.com/mkulesh/onpc) | Java / Android | Reference implementation for eISCP messages and list handling (`NLA`, `NLS`, `NLT`, `CCD`, `NFI`). |
+| [miracle2k/onkyo-eiscp](https://github.com/miracle2k/onkyo-eiscp) | Python | Command database (YAML) with parameter values and descriptions. |
+| [tillbaks/node-eiscp](https://github.com/tillbaks/node-eiscp) | JavaScript / Node | Node.js client and command reference (`eiscp-commands.json`). |
+| [owagner/onkyo2mqtt](https://github.com/owagner/onkyo2mqtt) | Python | Example of eISCP → MQTT bridge and automatic reconnection. |
+| [cljk/jEISCP](https://github.com/cljk/jEISCP) | Java | Remote JavaFX with raw ISCP console for debugging. |
+| [crowbarz/aiopioneer](https://github.com/crowbarz/aiopioneer) | Python | Complete Pioneer API library with decoders and code map. |
+| [crowbarz/ha-pioneer_async](https://github.com/crowbarz/ha-pioneer_async) | Python | Home Assistant integration based on `aiopioneer`. |
+| [okeck1982/ioBroker.pioneer_sc_vsx](https://github.com/okeck1982/ioBroker.pioneer_sc_vsx) | JavaScript | ioBroker adapter mapping Pioneer properties to commands. |
+| [domblb/avrpi](https://github.com/domblb/avrpi) | JavaScript / Node | Command catalog and eISCP simulator for testing. |
+| [HerrRiebmann/eISCP-Interface](https://github.com/HerrRiebmann/eISCP-Interface) | C++ / ESP32 | Minimal reference for packet construction and parsing. |
+
+---
+
+
 ## 📜 License
 
 MIT — see [LICENSE](LICENSE).
