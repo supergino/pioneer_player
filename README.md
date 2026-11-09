@@ -134,6 +134,28 @@ The HM86D does not report track number or playback time over eISCP. This app kee
 
 ---
 
+## 🖥️ Supported Devices
+
+This controller is built for the **Pioneer X-HM86D**, but it can be used with other **Pioneer / Onkyo / Integra** receivers provided they meet the following requirements.
+
+### Minimum requirements
+- **eISCP / ISCP over TCP** on port `60128`
+- Basic control commands: `PWR` (power), `MVL` (volume), `AMT` (mute), `SLI` (input selector)
+- USB / NET tracklist browsing: `NTC LIST`, `NLA`, `NLS`, `NLT`
+- File information: `NFI` (format, sample frequency, bit rate)
+- Tone controls: `TFR` (bass / treble)
+- DAC digital filter: `DGF` (Slow / Sharp / Short)
+- Network playback status: `NST`, `NTI`, `NAT`, `NAL`, `NTR`, `NTM`
+- Album art: `NJA`
+
+### Optional (built-in CD player)
+If the receiver has an integrated CD player, these commands enable CD support:
+- `CST` (CD play status)
+- `DST` (disc status / disc inserted)
+- `CCD` (CD operations: `PLAY`, `STOP`, `PAUSE`, `SKIP.F`, `SKIP.R`)
+
+> ⚠️ **Note:** input selector codes (`SLI`) vary by model. If your receiver uses different codes than the HM86D, you may need to update the input map in the code. Zone 2/3, tuner, listening mode (`LMD`), HDMI CEC and other model-specific features are not yet implemented.
+
 ## 🧩 Compatibility with other models
 
 The transport layer (TCP + ISCP framing on port 60128) is shared by the whole **Onkyo / Pioneer / Integra** family, but **input codes and features differ per model**.
