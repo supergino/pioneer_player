@@ -17,8 +17,52 @@ let deviceHost = process.env.DEVICE_HOST || '192.168.100.6';
 let devicePort = process.env.DEVICE_PORT ? Number(process.env.DEVICE_PORT) : DEFAULT_PORT;
 
 const client = new EiscpClient(deviceHost, devicePort);
-const app = express();
-app.use(express.json());
+
+// MAC del ricevitore per il Wake-on-LAN (usato per accendersi dallo standby
+// quando la rete non risponde ancora ai comandi eISCP).
+const DEVICE_MAC = process.env.DEVICE_MAC || '00:09:B0:1F:A9:DF';
+
+// Broadcast della rete del dispositivo, derivato dall'IP (x.y.z.255).
+function deviceBroadcast() {
+  if (process.env.DEVICE_BROADCAST) return process.env.DEVICE_BROADCAST;
+  const parts = String(deviceHost).split('.');
+  if (parts.length === 4) return parts.slice(0, 3).join('.') + '.255';
+  return '255.255.255.255';
+}
+
+// Invia il magic packet e forza un tentativo di connessione immediato.
+async function wakeReceiver() {
+  try {
+    const result = await wakeOnLan(DEVICE_MAC, deviceBroadcast());
+    client.logLine('out', 'WoL magic packet → ' + DEVICE_MAC);
+    client.reconnectNow();
+    return result;
+  } catch (e) {
+    client.logLine('out', 'WoL fallito: ' + e.message);
+    throw e;
+  }
+}
+
+// Accende il ricevitore e verifica che il comando abbia avuto effetto.
+// Alcuni firmware in standby di rete accettano la connessione ma ignorano
+// PWR 01: in quel caso si invia un magic packet Wake-on-LAN e si riprova.
+function powerOnAndVerify() {
+  const sent = client.send('PWR', '01');
+  if (!sent) return false;
+  setTimeout(() => { if (client.connected) client.send('PWR', 'QSTN'); }, 800);
+  setTimeout(async () => {
+    if (client.state.power === 'on') return;
+    client.logLine('out', 'PWR 01 senza effetto: invio Wake-on-LAN e riprovo');
+    try { await wakeOnLan(DEVICE_MAC, deviceBroadcast()); } catch (_) {}
+    setTimeout(() => {
+      if (client.connected) client.send('PWR', '01');
+      setTimeout(() => { if (client.connected) client.send('PWR', 'QSTN'); }, 800);
+    }, 4000);
+  }, 3000);
+  return true;
+}
+
+const app = express();app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ---------------------------------------------------------------------------
@@ -88,6 +132,9 @@ function scheduleFullList(delay, withListMode) {
 // non spostare il cursore del dispositivo durante la navigazione).
 const listWatchdog = setInterval(() => {
   if (!client.connected || !isListInput() || client.state.listComplete) return;
+  // In modalità riproduzione il firmware rifiuta le richieste XML complete:
+  // si evita di disturbare la riproduzione in corso.
+  if (client.state.listUiType === '2') return;
   requestFullList(false);
 }, LIST_RETRY_MS);
 if (listWatchdog.unref) listWatchdog.unref();
@@ -96,6 +143,9 @@ let lastListInput = null;
 client.on('state', (s) => {
   if (s.input !== lastListInput) {
     lastListInput = s.input;
+    // Cambio sorgente: la nuova lista riparte dalla radice del servizio.
+    client.state.listLayer = 1;
+    client.state.listReqLayer = 1;
     if (LIST_INPUTS.includes(s.input)) scheduleFullList(1000, true);
   }
 });
@@ -579,10 +629,23 @@ app.post('/api/wol', async (req, res) => {
 
 // Costruisce il parametro NLA che chiede l'intera lista (0 → totale),
 // invece di un numero fisso di tracce. Segue lo stesso schema del progetto
-// mkulesh/onpc (XmlListInfoMsg.getListedData).
+// mkulesh/onpc (XmlListInfoMsg.getListedData): il layer è quello della lista
+// corrente ed è tenuto dal client (`state.listLayer`), mai un valore fisso.
+function currentListLayer() {
+  const itemLayer = (client.state.listItems || [])
+    .map((it) => Number(it && it.layers))
+    .find((n) => Number.isFinite(n) && n > 0);
+  const layer = Number(client.state.listLayer) || itemLayer || 1;
+  return Math.max(1, Math.min(255, layer));
+}
+
 function buildNlaParam() {
-  const layers = client.state.listNumberOfLayers || 4;
-  const total = client.state.listNumberOfItems || 0xFFFF;
+  const layers = currentListLayer();
+  client.state.listReqLayer = layers;
+  const total = Math.max(
+    Number(client.state.listNumberOfItems) || 0,
+    Number(client.state.listTotal) || 0
+  ) || 0xFFFF;
   const end = total.toString(16).toUpperCase().padStart(4, '0');
   const layerHex = layers.toString(16).toUpperCase().padStart(2, '0');
   return 'L0000' + layerHex + '0000' + end;
@@ -612,41 +675,88 @@ app.get('/api/list/snapshot', (req, res) => {
     total: client.state.listTotal || 0,
     complete: client.state.listComplete === undefined ? false : client.state.listComplete,
     title: client.state.title || '',
-    layers: client.state.listNumberOfLayers || 0,
+    layers: client.state.listLayer || 0,
   });
 });
 
 app.post('/api/list/select', (req, res) => {
-  const { id } = req.body || {};
+  const { id, folder } = req.body || {};
   if (!client.connected) {
     return res.status(503).json({ error: 'Device not reachable' });
   }
-  const layers = client.state.listNumberOfLayers || 4;
   const itemId = parseInt(id, 10) || 0;
-  const param = 'I' + layers.toString(16).padStart(2, '0').toUpperCase() + itemId.toString(16).padStart(4, '0').toUpperCase() + '----';
-  // La lista sta per cambiare: consenti alle righe NLS di ricostruire la
-  // nuova pagina, poi NLA la completa.
-  client.state.listComplete = false;
-  client.send('NLA', param);
-  // Request updated list after selection
-  setTimeout(() => {
-    client.send('NLT', 'QSTN');
-    client.send('NLA', buildNlaParam());
-  }, 1000);
-  res.json({ ok: true, param });
+  const item = (client.state.listItems || []).find((it) => Number(it && it.id) === itemId);
+  // Il layer deve essere quello della lista attualmente visualizzata: il
+  // ricevitore lo allega a ogni item dell'XML. Usare un valore sbagliato
+  // (o un fallback fisso) fa rispondere "unsupported at this moment".
+  const layers = Math.max(1, Math.min(255,
+    Number(item && item.layers) || currentListLayer()));
+  const param = 'I' + hex2(layers) +
+    itemId.toString(16).toUpperCase().padStart(4, '0') + '----';
+  const isFolder = folder === true || folder === 1 || folder === '1' ||
+    !!(item && (item.iconid === '29' || item.iconid === 'HS01' || item.icontype === 'F'));
+
+  // La lista sta per cambiare solo se si entra in una cartella: selezionando
+  // un brano la lista visualizzata resta valida (niente "Caricamento…").
+  client.state.listComplete = !isFolder;
+
+  const doSelect = () => {
+    if (!client.connected) return;
+    client.send('NLA', param);
+    if (isFolder) client.state.listLayer = Math.min(255, layers + 1);
+    setTimeout(() => { if (client.connected) client.send('NLT', 'QSTN'); }, 700);
+    // In riproduzione il firmware risponde "unsupported" alle richieste XML:
+    // l'XML completo si richiede solo per le cartelle e se la UI è in lista.
+    setTimeout(() => {
+      if (!client.connected || !isFolder) return;
+      if (client.state.listUiType !== '2') requestFullList(false);
+    }, 1400);
+  };
+
+  // Dopo il play il ricevitore passa in modalità riproduzione (NLT u=2) e
+  // rifiuta la selezione finché non lo si riporta in modalità lista.
+  if (client.state.listUiType === '2') {
+    client.send('NTC', 'LIST');
+    setTimeout(doSelect, 500);
+  } else {
+    doSelect();
+  }
+
+  res.json({ ok: true, param, layers, playbackMode: client.state.listUiType === '2' });
 });
+
+// In modalità riproduzione i comandi di navigazione lista (NTC UP/DOWN/RETURN)
+// non vengono accettati: prima si riporta il dispositivo in modalità lista.
+function withListMode(fn) {
+  if (!client.connected) return;
+  if (client.state.listUiType === '2') {
+    client.send('NTC', 'LIST');
+    setTimeout(fn, 500);
+  } else {
+    fn();
+  }
+}
+
+function refreshListAfterNav(delay) {
+  setTimeout(() => {
+    if (!client.connected) return;
+    client.send('NLT', 'QSTN');
+    if (client.state.listUiType !== '2') {
+      client.send('NLA', buildNlaParam());
+    }
+  }, delay);
+}
 
 app.post('/api/list/back', (req, res) => {
   if (!client.connected) {
     return res.status(503).json({ error: 'Device not reachable' });
   }
-  // Send NTC RETURN to go back
   client.state.listComplete = false;
-  client.send('NTC', 'RETURN');
-  setTimeout(() => {
-    client.send('NLT', 'QSTN');
-    client.send('NLA', buildNlaParam());
-  }, 500);
+  client.state.listLayer = Math.max(1, currentListLayer() - 1);
+  withListMode(() => {
+    client.send('NTC', 'RETURN');
+    refreshListAfterNav(600);
+  });
   res.json({ ok: true });
 });
 
@@ -654,12 +764,11 @@ app.post('/api/list/up', (req, res) => {
   if (!client.connected) {
     return res.status(503).json({ error: 'Device not reachable' });
   }
-  client.send('NTC', 'UP');
   client.state.listComplete = false;
-  setTimeout(() => {
-    client.send('NLT', 'QSTN');
-    client.send('NLA', buildNlaParam());
-  }, 500);
+  withListMode(() => {
+    client.send('NTC', 'UP');
+    refreshListAfterNav(500);
+  });
   res.json({ ok: true });
 });
 
@@ -667,19 +776,35 @@ app.post('/api/list/down', (req, res) => {
   if (!client.connected) {
     return res.status(503).json({ error: 'Device not reachable' });
   }
-  client.send('NTC', 'DOWN');
   client.state.listComplete = false;
-  setTimeout(() => {
-    client.send('NLT', 'QSTN');
-    client.send('NLA', buildNlaParam());
-  }, 500);
+  withListMode(() => {
+    client.send('NTC', 'DOWN');
+    refreshListAfterNav(500);
+  });
   res.json({ ok: true });
 });
 
-app.post('/api/command', (req, res) => {
+app.post('/api/command', async (req, res) => {
   const { action, value, player } = req.body || {};
 
   if (!client.connected) {
+    // Accensione da standby: il ricevitore non risponde a eISCP finché non è
+    // sveglio, quindi si invia prima un magic packet Wake-on-LAN e si forza
+    // subito un nuovo tentativo di connessione.
+    const turningOn = action === 'power' && value !== 'off';
+    if (turningOn) {
+      try {
+        const wol = await wakeReceiver();
+        return res.json({ ok: true, waking: true, mac: DEVICE_MAC, wol });
+      } catch (e) {
+        return res.status(502).json({
+          error: 'Wake-on-LAN failed',
+          detail: e.message,
+          hint: 'Il ricevitore non risponde e il magic packet non è partito. ' +
+            'Verifica che sia alimentato e collegato alla rete.',
+        });
+      }
+    }
     return res.status(503).json({
       error: 'Device not reachable',
       detail: client.lastError || 'not connected',
@@ -692,9 +817,10 @@ app.post('/api/command', (req, res) => {
 
   switch (action) {
     case 'power':
-      if (value === 'on') ok = client.send('PWR', '01');
-      else if (value === 'off') ok = client.send('PWR', '00');
-      else ok = client.send('PWR', client.state.power === 'on' ? '00' : '01');
+      if (value === 'off') ok = client.send('PWR', '00');
+      else if (value === 'on') ok = powerOnAndVerify();
+      else if (client.state.power === 'on') ok = client.send('PWR', '00');
+      else ok = powerOnAndVerify();
       break;
     case 'volume':
       ok = client.send('MVL', hex2(Math.max(0, Math.min(100, Number(value)))));
@@ -781,7 +907,7 @@ app.post('/api/command', (req, res) => {
   res.json({ ok: true, action, state: client.state });
 });
 
-app.listen(HTTP_PORT, '0.0.0.0', () => {
+app.listen(HTTP_PORT, process.env.HTTP_BIND || '0.0.0.0', () => {
   console.log('==============================================');
   console.log('  Pioneer HM86D Controller (eISCP)');
   console.log('==============================================');

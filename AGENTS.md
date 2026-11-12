@@ -18,7 +18,21 @@ pioneer/
 │   └── index.html         # interfaccia web monolitica (HTML + CSS + JS inline)
 ├── launch.sh              # avvia server in background
 ├── stop.sh                # ferma server
-└── Avvia Pioneer.command  # scorciatoia macOS
+├── Avvia Pioneer.command  # scorciatoia macOS per avviare
+├── Chiudi Pioneer.command # scorciatoia macOS per fermare server e chiudere la UI
+└── desktop/               # wrapper Tauri: app macOS standalone (.app)
+    ├── README.md          # build e uso dell'app desktop
+    ├── package.json       # @tauri-apps/cli
+    ├── ui/                # segnaposto frontend richiesto da Tauri (la UI vera è servita da Express)
+    ├── scripts/
+    │   ├── prepare-resources.sh  # copia server/dipendenze/runtime Node in src-tauri/resources
+    │   └── build-app.sh          # prepare + tauri build
+    └── src-tauri/
+        ├── Cargo.toml
+        ├── tauri.conf.json
+        ├── Info.plist     # NSLocalNetworkUsageDescription (permesso Rete locale)
+        ├── icons/
+        └── src/main.rs    # avvia server.js su porta libera e apre la finestra nativa
 ```
 
 Non ci sono cartelle `src/`, `dist/`, build step o framework frontend. Tutto gira su Node.js + Express con un unico file HTML servito come static.
@@ -35,6 +49,7 @@ Non ci sono cartelle `src/`, `dist/`, build step o framework frontend. Tutto gir
 | Comunicazione server→browser | Server-Sent Events (SSE) | `GET /api/events` |
 | Frontend | HTML/CSS/JS puro in `public/index.html` | nessun framework, nessun bundler |
 | Avvio | `launch.sh` / `stop.sh` | shell script |
+| App desktop | Tauri 2 (Rust) + runtime Node incluso | `desktop/` |
 
 ---
 
@@ -45,6 +60,8 @@ Non ci sono cartelle `src/`, `dist/`, build step o framework frontend. Tutto gir
 - Serve i file statici di `public/`.
 - Espone API REST sotto `/api/*`.
 - Spinge aggiornamenti in tempo reale al browser via SSE (`/api/events`): eventi `status`, `state`, `log`, `nla`.
+- Ascolta su `HTTP_BIND` (default `0.0.0.0`; l'app desktop usa `127.0.0.1`) e `HTTP_PORT` (default `3000`; l'app desktop sceglie una porta libera).
+- **Accensione da standby**: `wakeReceiver()` invia un magic packet Wake-on-LAN (`DEVICE_MAC` + `DEVICE_BROADCAST`) e `powerOnAndVerify()` invia `PWR 01`, verifica con `PWR QSTN` dopo 800 ms e, se dopo 3 s lo stato non è `on`, riprova con WOL + nuovo `PWR 01` dopo 4 s.
 
 ### 3.2 Client eISCP (`eiscp.js`)
 - Classe `EiscpClient extends EventEmitter`.
@@ -52,8 +69,11 @@ Non ci sono cartelle `src/`, `dist/`, build step o framework frontend. Tutto gir
 - Riceve messaggi asincroni, li parse e aggiorna `this.state` (oggetto con tutti i campi: power, volume, input, title, artist, album, listItems, fileFormat, sampleFrequency, bitRate, digitalFilter, ecc.).
 - Emette eventi: `status`, `state`, `log`, `nla`, `message`.
 - Polling periodico ogni 10s: `PWR, MVL, AMT, SLI, TFR, DGF, NFI` + `CST, DST` in sorgente CD, oppure `NST, NTR` per le altre sorgenti.
-- **Caricamento automatico della tracklist**: all'avvio (e ad ogni riconnessione, se la lista non è completa) `server.js` invia `NTC LIST` + `NLA` per ottenere l'intera lista USB/NET. Un watchdog ogni 4 s richiede `NLA` finché `state.listComplete` non è true. Il caricamento non dipende dal browser.
+- **Caricamento automatico della tracklist**: all'avvio (e ad ogni riconnessione, se la lista non è completa) `server.js` invia `NTC LIST` + `NLA` per ottenere l'intera lista USB/NET. Un watchdog ogni 4 s richiede `NLA` finché `state.listComplete` non è true. Il caricamento non dipende dal browser. Il watchdog **non** invia richieste XML complete mentre il dispositivo è in UI riproduzione (`state.listUiType === '2'`), perché il firmware risponde `unsupported at this moment`.
+- **Layer della lista**: il numero di layer è tenuto dal controller in `state.listLayer` (1 = radice del servizio), non letto da `NLT` (le risposte dell'HM86D possono essere troncate). Ogni item dell'XML porta il proprio `layers`, ricavato da `state.listReqLayer` (layer usato nell'ultima richiesta `NLA L…`). I campi `listLayers` (ultimo valore dichiarato da `NLT`) e `listUiType` (`'0'` lista, `'2'` riproduzione) sono di supporto. Cambiando sorgente (`SLI`) `server.js` riporta `listLayer` a 1.
+- **Parser `NLT` tollerante**: il formato è `xxuycccciiiillsraabbss + titoloBar`; il parser legge i campi disponibili (UI type da 3 caratteri, cursore/item/layer da 14) invece di scartare tutto con `length >= 22`, perché l'HM86D tronca alcune risposte a 20 caratteri. In UI riproduzione (`u=2`) il `NLT` descrive il brano, quindi **non** aggiorna il layer di navigazione.
 - `queryAll()` all'avvio chiede stato iniziale.
+- **Salute della connessione**: `setKeepAlive(true, 15000)` sulla socket e `checkStaleConnection()` (watchdog ogni 5 s) che chiude e riconnette se non arriva alcun messaggio per 25 s, perché dopo lo standby il TCP può restare half-open (nessun FIN). `connectedAt` / `lastMessageAt` sono inizializzati alla connessione; `reconnectNow()` forza un nuovo tentativo (usato dopo il Wake-on-LAN).
 - In sorgente CD (`23`) il lettore integrato usa un set di comandi dedicato: `CST` (stato di riproduzione, 3 lettere), `DST` (disco inserito: `00` nessuno / `04` CD audio / `07` CD MP3), `CTM` (tempo, non supportato dall'HM86D), `CCD` (operazioni: `PLAY`, `STOP`, `PAUSE`, `SKIP.F`, `SKIP.R`).
 - **L'HM86D non comunica il numero di traccia del CD**: in sorgente CD `NTR`, `NTM` e `CTM` restano muti. Il contatore (`state.cdTrack`) è quindi tenuto dal controller e aggiornato sui comandi `CCD SKIP.F` / `CCD SKIP.R` inviati dall'app (`cdSkip()`, `cdSetTrack()`, `cdEnsureTrack()`). Va riallineato a mano (pulsanti ±) se la skip viene data dal telecomando del dispositivo.
 - **Orologio virtuale del CD** (`tickCdClock()`, timer 1 Hz in `startPolling()`): siccome il dispositivo non comunica né traccia né tempo del CD, il controller calcola l'avanzamento sommando il tempo effettivamente trascorso in riproduzione (stato `CST`) e consumando la durata delle tracce inviate dal browser (`state.cdTracklist`, ms; indice 0 = traccia 1). Quando il tempo trascorso raggiunge la durata della traccia corrente il contatore passa alla successiva e il tempo residuo viene riportato (`cdElapsed`).
@@ -80,6 +100,9 @@ Non ci sono cartelle `src/`, `dist/`, build step o framework frontend. Tutto gir
 - **Avanzamento automatico del CD**: quando l'utente seleziona una release MusicBrainz, `applyCdRelease()` invia le durate delle tracce al server con `POST /api/cd/tracklist` (`durationMs` = campo `length` di MusicBrainz). Il controller le usa per avanzare da solo il contatore (vedi "Orologio virtuale del CD" in 3.2). Il pannello `cdDurationNote` avvisa se la release non ha durate (avanzamento non disponibile) o se sono parziali (stima).
 - Icona play/pause sincronizzata con `st.playStatus` (per il CD lo stato arriva da `CST`).
 - Pulsante "Testo" attivo anche in sorgente CD: artista e titolo della traccia corrente arrivano dalla tracklist MusicBrainz selezionata, quindi il testo del brano viene cercato normalmente.
+- **Pulsante ⏻ sempre attivo**: `setEnabled()` non disabilita `powerBtn`, così si può accendere il ricevitore anche quando è offline/in standby. Se il client non è connesso il click invia un magic packet Wake-on-LAN (`POST /api/wol`) + `client.reconnectNow()` e mostra "Wake-on-LAN…" con un toast; in caso di dispositivo già connesso invia `PWR 01`.
+- **Pannello Diagnostica con log live**: oltre a TCP ping/gateway/launchd, mostra gli ultimi 15 messaggi eISCP in `pre.diag-log` (`→` inviati, `←` ricevuti) letti da `/api/log`, utili per verificare se i comandi raggiungono il ricevitore.
+- **Selezione dalla tracklist**: il click su una riga invia `POST /api/list/select` con `{id, folder}` — `folder: true` per entrare in una cartella, `false` per avviare un brano. In questo modo il server sa se la lista cambierà e se deve tornare in modalità lista prima della selezione.
 
 ---
 
@@ -114,7 +137,15 @@ Formato parametro `NLA` per lista completa (seguendo lo schema del progetto `mku
 ```
 L0000<LL>0000<EEEE>
 ```
-dove `<LL>` = numero di layer (2 cifre hex, default `04`) e `<EEEE>` = indice fine lista (4 cifre hex, default `FFFF` se sconosciuto).
+dove `<LL>` = layer della lista corrente (2 cifre hex, da `currentListLayer()` / `state.listLayer` — **mai** un valore fisso) e `<EEEE>` = indice fine lista (4 cifre hex; `max(listNumberOfItems, listTotal)`, `FFFF` se sconosciuto).
+
+Selezione di una riga:
+```
+I<LL><IIII>----
+```
+con `<LL>` = layer dell'item (`item.layers`, fallback `currentListLayer()`) e `<IIII>` = id dell'item (4 cifre hex). Un layer sbagliato produce `status="fail" error [3] unsupported at this moment` e mette in pausa la riproduzione.
+
+> **Modalità lista vs riproduzione**: appena parte un brano il ricevitore passa in UI riproduzione (`NLT` u=2) e rifiuta sia le selezioni sia le richieste XML complete. Prima di selezionare, navigare o ricaricare la lista va inviato `NTC LIST` e atteso ~500 ms (`withListMode()` in `server.js`).
 
 ---
 
@@ -128,20 +159,20 @@ dove `<LL>` = numero di layer (2 cifre hex, default `04`) e `<EEEE>` = indice fi
 | `/api/art` | GET | Copertina album (proxy per evitare CORS/mixed-content) |
 | `/api/host` | POST | Cambia IP/porta del dispositivo |
 | `/api/diag` | GET | Diagnostica di rete (TCP ping, gateway, launchd) |
-| `/api/wol` | POST | Wake-on-LAN |
-| `/api/list/refresh` | POST | Ricarica lista USB/NET da zero |
-| `/api/list/select` | POST `{id}` | Seleziona traccia o entra in cartella |
-| `/api/list/back` | POST | Torna alla cartella padre (`NTC RETURN`) |
+| `/api/wol` | POST `{mac?, broadcast?}` | Wake-on-LAN con magic packet; default da `DEVICE_MAC` e dal broadcast derivato dall'IP del dispositivo |
+| `/api/list/refresh` | POST | Ricarica lista USB/NET da zero (`NTC LIST` + `NLA`) |
+| `/api/list/select` | POST `{id, folder}` | Seleziona traccia (`folder:false`) o entra in cartella (`folder:true`). Se il dispositivo è in UI riproduzione invia prima `NTC LIST`, attende 500 ms e poi `NLA I<layer><id>----` con il layer dell'item |
+| `/api/list/back` | POST | Torna alla cartella padre (`NTC RETURN`), passa prima in modalità lista se serve |
 | `/api/list/up` | POST | Su nella lista (`NTC UP`) |
 | `/api/list/down` | POST | Giù nella lista (`NTC DOWN`) |
-| `/api/list/snapshot` | GET | Restituisce snapshot lista in memoria sul server |
+| `/api/list/snapshot` | GET | Restituisce snapshot lista in memoria sul server (`items`, `total`, `complete`, `title`, `layers` = `state.listLayer`) |
 | `/api/lyrics` | GET `?artist=…&title=…` | Proxy per testi canzone. Prova più fonti pubbliche (api.lyrics.ovh, makeitpersonal.co, some-random-api.ml) con varianti di artista/titolo (pulizia feat/remix/live, ecc.) e restituisce solo la PRIMA versione trovata |
 | `/api/cd/lookup` | GET `?discid=…` | Cerca release MusicBrainz per Disc ID (`inc=recordings+artist-credits` per elenco tracce e artista) |
 | `/api/cd/search` | GET `?artist=…&album=…` | Cerca release MusicBrainz per artista e/o titolo disco (ricerca parziale, entrambi opzionali, max 10 risultati) |
 | `/api/cd/release` | GET `?id=…` | Dettaglio release MusicBrainz con l'elenco tracce e l'artista (`inc=recordings+artist-credits`): la ricerca restituisce `media` **senza** `tracks`, quindi va richiesto il dettaglio |
 | `/api/cd/track` | POST `{delta}` o `{value}` | Allinea il contatore tracce CD (`state.cdTrack`); `delta` incrementa/decrementa, `value` imposta il numero assoluto |
 | `/api/cd/tracklist` | POST `{tracks:[{index,durationMs}]}` | Invia dal browser le durate delle tracce CD (MusicBrainz `length` in ms) al controller: alimenta l'orologio virtuale che avanza il contatore (`state.cdTracklist`, `state.cdAvgDuration`) |
-| `/api/command` | POST `{action, value}` | Comandi generici (power, volume, input, play, bass, treble, digitalFilter, sleep, dimmer, raw). `digitalFilter` accetta `00`/`01`/`02` e invia `DGF` |
+| `/api/command` | POST `{action, value}` | Comandi generici (power, volume, input, play, bass, treble, digitalFilter, sleep, dimmer, raw). `digitalFilter` accetta `00`/`01`/`02` e invia `DGF`. Con client disconnesso `power: "on"` invia Wake-on-LAN e risponde `{ok:true, waking:true}` |
 
 ---
 
@@ -175,6 +206,7 @@ dove `<LL>` = numero di layer (2 cifre hex, default `04`) e `<EEEE>` = indice fi
 - `renderState(st)` aggiorna UI (volume, knobs, titolo, artista, album, info file, tracklist).
 - `renderStatus(s)` aggiorna badge connessione e abilitazione controlli.
 - Campi di stato aggiunti per il CD: `cdTrack`, `cdTrackKnown`, `cdTracklist` (durate ms), `cdAvgDuration`, `cdElapsed` (secondi), `cdDisc`, `cdStatus`, `cdRepeat`, `cdShuffle`.
+- Campi di stato per le liste: `listLayer` (layer di navigazione corrente, 1 = radice), `listReqLayer` (layer dell'ultima richiesta `NLA L…`, usato per `item.layers`), `listLayers` (ultimo layer dichiarato da `NLT`, informativo), `listUiType` (`'0'` lista, `'2'` riproduzione: in playback selezioni e XML sono rifiutati), `listComplete`, `listTotal`, `listNumberOfItems`, `listCursor`. Ogni item ha `id`, `title`, `iconid`, `icontype`, `layers`, `selectable`.
 
 ---
 
@@ -186,7 +218,7 @@ Quando si modifica il codice, assicurarsi di non reintrodurre questi bug già fi
 |---|---|---|
 | Tracklist USB carica solo 4 voci all'avvio | Il ricevitore, appena connesso, invia solo le prime righe `NLS` della pagina (es. 4 voci) e non la lista completa. Il server carica da solo la lista completa (`NTC LIST` + `NLA`) all'avvio, al cambio sorgente USB/NET e ad ogni riconnessione, con un watchdog ogni 4 s finché `listComplete` non è true; rimosso `NLS QSTN` dalle sequenze `NLA`. Le righe `NLS` non sovrascrivono più una lista completa (aggiornano solo l'indicatore di riproduzione). Il frontend mostra "Caricamento…" finché la lista non è completa (solo dopo 12 s mostra l'eventuale parziale) | `server.js` + `eiscp.js` + `public/index.html` |
 | Lista pannello che sembra "in cache" | `/api/state` e `/api/list/snapshot` inviano `Cache-Control: no-store` | `server.js` |
-| Tracklist mostra solo prime 19 tracce | `buildNlaParam()` chiede `0 → 0xFFFF` invece di `L00000400000013` fisso | `server.js` |
+| Tracklist mostra solo prime 19 tracce | `buildNlaParam()` chiede `0 → totale` (fino a `FFFF`) invece di `L00000400000013` fisso, con il layer della lista corrente | `server.js` |
 | Tornando indietro restano tracce vecchie | Nel `NLS`, se `lineNum === 0` e `listComplete` non è true si svuota `listItems` | `eiscp.js` |
 | `NLA` non sostituisce lista più corta | `NLA` sostituisce sempre se `status="ok"` | `eiscp.js` |
 | Tracklist bloccata su "Caricamento…" | Timeout 12s: dopo mostra comunque quanto raccolto | `public/index.html` |
@@ -212,6 +244,14 @@ Quando si modifica il codice, assicurarsi di non reintrodurre questi bug già fi
 | Caratteri accentati/smart quote mostrati male (es. `â`) | Il corpo del messaggio eISCP veniva decodificato come Latin-1; cambiato in UTF-8 in `extractMessage()` (`eiscp.js`) | `eiscp.js` |
 | Pannello Sistema in basso a destra | Spostato sotto il pannello tracklist nella colonna sinistra (`.left-col`: flex column) | `public/index.html` |
 | Filtro DAC non gestito dall'app | Aggiunto il comando `DGF` (`00` Slow, `01` Sharp, `02` Short): parsing in `eiscp.js`, azione `digitalFilter` in `/api/command` e selettore nel pannello Toni | `eiscp.js` + `server.js` + `public/index.html` |
+| Pulsante Accendi inutilizzabile con dispositivo in standby/offline | Il pulsante non viene più disabilitato da `setEnabled()`: se il client non è connesso invia un magic packet Wake-on-LAN (`wakeOnLan()` + `client.reconnectNow()`) e il server risponde `{ok:true,waking:true}`; il frontend mostra "Wake-on-LAN…" e un toast. MAC/broadcast configurabili con `DEVICE_MAC` / `DEVICE_BROADCAST` | `eiscp.js` + `server.js` + `public/index.html` |
+| Badge "Connesso" ma comandi persi dopo lo standby del ricevitore | La socket TCP può restare half-open senza FIN: `checkStaleConnection()` (watchdog ogni 5 s) chiude e riconnette se non arriva alcun messaggio per 25 s; `connectedAt`/`lastMessageAt` inizializzati alla connessione e `setKeepAlive(true, 15000)` | `eiscp.js` |
+| `PWR 01` ignorato dal firmware in standby di rete | `powerOnAndVerify()` invia `PWR 01`, richiede `PWR QSTN` dopo 800 ms e, se dopo 3 s lo stato non è `on`, manda un magic packet e riprova dopo 4 s | `server.js` |
+| Diagnostica senza traffico eISCP | Il pannello diagnostica mostra gli ultimi 15 messaggi (`/api/log`) in `pre.diag-log`, con direzione → / ← | `public/index.html` |
+| Selezione di un altro brano bloccata durante la riproduzione | Il ricevitore, appena parte il play, passa in UI "playback" (`NLT` u=2) e risponde `NLA status="fail" error [3] unsupported at this moment` alla selezione, fermando anche l'audio. `/api/list/select` ora invia prima `NTC LIST` (torna in modalità lista), aspetta 500 ms e poi `NLA I<layer><id>----` | `server.js` |
+| Layer sbagliato nel comando `NLA I…` (fallback fisso 4) | Il layer è quello della lista corrente: `state.listLayer`, aggiornato dalla navigazione/NLT (solo con UI lista) e allegato a ogni item dall'XML (`item.layers`, dal layer della richiesta `listReqLayer`). `buildNlaParam()` non usa più `listNumberOfLayers || 4` e lo snapshot espone `listLayer` | `eiscp.js` + `server.js` |
+| NLT troncato a 20 caratteri ignorato | Il parser NLT legge i campi disponibili (UI type da 3 caratteri, layer da 14) invece di scartare tutto con `length >= 22`; in UI playback non aggiorna il layer di navigazione | `eiscp.js` |
+| Richieste XML complete durante il play | Il watchdog lista e l'aggiornamento post-selezione non inviano `NLA L…` quando `listUiType === '2'` (il firmware le rifiuta); la lista resta valida se si seleziona un brano (`listComplete = !isFolder`) | `server.js` |
 
 ---
 
@@ -231,6 +271,9 @@ Prima di proporre o applicare una modifica, verificare:
 10. Testare CD (lettore integrato): verificare in `/api/state` che `cdDisc` sia `audio` con un disco inserito, che `cdStatus`/`playStatus` cambino con play/pausa/stop, che `cdTrack` si incrementi con la skip avanti e si decrementi con la skip indietro, e che la pillola sorgente mostri `CD Audio · Traccia N`. Se la skip è stata data dal telecomando del ricevitore, riallineare il contatore con i pulsanti ±.
 11. Testare l'avanzamento automatico del CD: selezionare una release MusicBrainz **con durate** (campo `length` valorizzato), verificare in `/api/state` che `cdTracklist` contenga le durate in ms e che `cdElapsed` cresca durante il play e resti fermo in pausa. Il contatore deve passare alla traccia successiva quando il tempo raggiunge la durata.
 12. Testare il filtro DAC: verificare in `/api/state` che `digitalFilter` sia `00`/`01`/`02`, che il pulsante corrispondente sia attivo nel pannello Toni e che un click invii `DGF`. Per non modificare l'impostazione del ricevitore, provare con il valore già attivo.
+13. Testare il cambio brano **durante la riproduzione**: con un brano in play selezionare un'altra traccia della lista. Nel log eISCP deve comparire `NTC LIST` prima di `NLA I<layer><id>----`, il layer deve corrispondere alla lista aperta (non `04` fisso) e la riproduzione non deve interrompersi.
+14. Testare accensione e diagnostica: con ricevitore in standby il pulsante ⏻ deve restare cliccabile e inviare Wake-on-LAN (`{ok:true,waking:true}`); nel pannello Diagnostica devono apparire gli ultimi messaggi eISCP con direzione `→`/`←`.
+15. Se si modificano `server.js`, `eiscp.js` o `public/index.html`, ricompilare l'app desktop: `cd desktop && ./scripts/build-app.sh`.
 
 ---
 
@@ -256,9 +299,24 @@ Cosa verificare dopo ogni cambio:
 - [ ] USB tracklist carica completamente (non solo prime 19 tracce).
 - [ ] Click su cartella 📁 entra nella sottocartella.
 - [ ] Click su traccia 🎵 avvia riproduzione.
+- [ ] Con un brano in riproduzione, click su un'altra traccia: il brano cambia senza fermare l'audio.
 - [ ] Pulsante ← Indietro torna alla cartella padre.
 - [ ] Knobs Bass/Treble si muovono e cambiano valore nel dispositivo.
 - [ ] Durante riproduzione appare `trackInfo` con formato es. `FLAC · 192 kHz · 24 bit`.
+- [ ] Con il ricevitore offline il pulsante ⏻ resta attivo e invia Wake-on-LAN.
+- [ ] Il pannello Diagnostica mostra il log eISCP live (`→` / `←`).
+
+### App desktop
+
+```bash
+cd desktop
+./scripts/build-app.sh
+open "src-tauri/target/release/bundle/macos/Pioneer Controller.app"
+```
+
+- [ ] L'app apre la finestra nativa senza Terminale/browser.
+- [ ] Alla chiusura il processo Node incluso termina (nessun server orfano).
+- [ ] Al primo avvio viene chiesto il permesso **Rete locale**.
 
 ---
 
@@ -267,16 +325,54 @@ Cosa verificare dopo ogni cambio:
 | Variabile | Default | Descrizione |
 |---|---|---|
 | `HTTP_PORT` | `3000` | Porta del server web |
+| `HTTP_BIND` | `0.0.0.0` | Interfaccia di ascolto del server web (l'app desktop usa `127.0.0.1`) |
 | `DEVICE_HOST` | `192.168.100.6` | IP del ricevitore Pioneer |
 | `DEVICE_PORT` | `60128` | Porta eISCP |
+| `DEVICE_MAC` | `00:09:B0:1F:A9:DF` | MAC del ricevitore per il Wake-on-LAN |
+| `DEVICE_BROADCAST` | `<rete del dispositivo>.255` | Indirizzo broadcast per il magic packet |
+
+Nell'app desktop (Tauri) le variabili del dispositivo sono prefissate:
+`PIONEER_DEVICE_HOST`, `PIONEER_DEVICE_PORT`, `PIONEER_DEVICE_MAC` e
+`PIONEER_DEVICE_BROADCAST`; `HTTP_PORT` è scelta automaticamente su loopback e
+passata al server.
 
 ---
 
-## 11. Riferimenti esterni utili
+## 11. App desktop (Tauri)
+
+La cartella `desktop/` contiene un wrapper Tauri 2 che impacchetta il progetto in una
+`.app` macOS standalone (nessun Terminale, nessun browser, nessun Node di sistema).
+**L'app compilata è il modo consigliato di usare il controller su Mac**: doppio clic,
+finestra nativa, server e runtime Node inclusi nel bundle.
+
+- `desktop/scripts/prepare-resources.sh` copia `server.js`, `eiscp.js`, `public/`,
+  `node_modules` di produzione e il runtime Node ufficiale in `src-tauri/resources/`
+  (cartella generata, gitignored). Il runtime è scaricato in `desktop/.cache`.
+- `desktop/src-tauri/src/main.rs` all'avvio: sceglie una porta libera su `127.0.0.1`,
+  avvia `node server.js` con cwd = resources, attende la porta (max 25 s) e crea una
+  `WebviewWindow` su `http://127.0.0.1:<porta>`. Alla chiusura (`RunEvent::Exit` /
+  `ExitRequested`) termina il processo Node. Il server ascolta solo su loopback
+  (`HTTP_BIND=127.0.0.1`).
+- Le variabili del dispositivo sono prefissate `PIONEER_*` (`PIONEER_DEVICE_HOST`,
+  `PIONEER_DEVICE_PORT`, `PIONEER_DEVICE_MAC`, `PIONEER_DEVICE_BROADCAST`) e passate al
+  server, che espone anche `DEVICE_*`/`HTTP_BIND` per l'uso web.
+- `src-tauri/Info.plist` dichiara `NSLocalNetworkUsageDescription` (permesso "Rete locale").
+- Log del server: `~/Library/Logs/com.andrea.pioneer/server.log`.
+- `tauri.conf.json` include `resources/**/*` nel bundle; la finestra è creata a runtime,
+  quindi `app.windows` è vuoto e `ui/` è solo un segnaposto richiesto dal build.
+- Build: `cd desktop && ./scripts/build-app.sh`. Output in
+  `desktop/src-tauri/target/release/bundle/{macos,dmg}` (`.app` ~145 MB, `.dmg` ~47 MB).
+- La build è firmata ad-hoc (uso locale). Per distribuirla servono Developer ID e
+  notarizzazione. Al primo avvio macOS chiede il permesso "Rete locale": va concesso.
+- Se si modificano `server.js`, `eiscp.js` o `public/`, va rifatta la build dell'app.
+
+---
+
+## 12. Riferimenti esterni utili
 
 Protocollo eISCP / ISCP: documentazione Pioneer/Onkyo (porte TCP 60128).
 
-### 11.1 Progetti open source di riferimento
+### 12.1 Progetti open source di riferimento
 
 Da consultare **prima** di aggiungere un nuovo comando o una nuova funzione: contengono il
 database comandi e implementazioni complete dello stesso protocollo.
@@ -294,7 +390,7 @@ database comandi e implementazioni complete dello stesso protocollo.
 | [`domblb/avrpi`](https://github.com/domblb/avrpi) | JavaScript / Node | Remote completo (web + Android) per VSX/SC: `lib/protocol.js` e `catalog-raw.json` contengono un catalogo comandi molto ampio, `lib/discovery.js` fa discovery SSDP, `lib/fake-device.js` + `lib/fake-eiscp.js` simulano un ricevitore. |
 | [`HerrRiebmann/eISCP-Interface`](https://github.com/HerrRiebmann/eISCP-Interface) | C++ (ESP32) | Controller ESP32 con OLED: `Outgoing.ino` / `Incoming.ino` mostrano costruzione e parsing dei pacchetti raw, `Udp.ino` la discovery UDP. Riferimento minimale sul protocollo. |
 
-### 11.2 File utili in `mkulesh/onpc`
+### 12.2 File utili in `mkulesh/onpc`
 
 Percorso base: `app/src/main/java/com/mkulesh/onpc/`
 
@@ -306,7 +402,7 @@ Percorso base: `app/src/main/java/com/mkulesh/onpc/`
 - `iscp/messages/DimmerLevelMsg.java` / `SleepMsg.java` → comandi `DIM` e `SLP`
 - `iscp/StateManager.java` → schema completo di richieste iniziali e gestione liste (`requestXmlListState`, `getListedData`)
 
-### 11.3 Idee di funzioni da aggiungere (già mappate nei repo)
+### 12.3 Idee di funzioni da aggiungere (già mappate nei repo)
 
 Usare il database comandi (`commands/main/*.yaml` di onkyo-eiscp o `eiscp-commands.json`
 di node-eiscp) per verificare codice e parametri prima di implementare. Candidati sensati
@@ -322,7 +418,7 @@ per questa UI:
 - **Media server / network service** (`NSV`, `NLS`): elenco servizi di rete (Spotify, TuneIn…).
 - **Firmware / device info** (`FWV`, `IFN`, `DVC`): versione firmware, nome device, modello.
 
-### 11.4 Spunti concreti per questo progetto
+### 12.4 Spunti concreti per questo progetto
 
 - **Discovery automatica** (`avrpi/lib/discovery.js`, `eISCP-Interface/Udp.ino`): SSDP/UDP per
   trovare il ricevitore e non dover impostare l'IP a mano (`DEVICE_HOST`).
@@ -335,7 +431,7 @@ per questa UI:
 - **Catalogo comandi esteso** (`avrpi/catalog-raw.json`, `aiopioneer/decoders/code_map.py`):
   nomi e valori per listening mode, DSP, video e tuner.
 
-### 11.5 Come usarli senza aggiungerli al repo
+### 12.5 Come usarli senza aggiungerli al repo
 
 Non serve clonarli dentro `pioneer/`: si possono consultare online oppure clonare in una
 cartella esterna (es. `~/Documents/GitHub/onpc`, `~/Documents/GitHub/onkyo-eiscp`) e leggere

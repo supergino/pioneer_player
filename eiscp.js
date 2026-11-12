@@ -119,6 +119,7 @@ class EiscpClient extends EventEmitter {
     this.reconnectTimer = null;
     this.shouldReconnect = true;
     this.lastMessageAt = 0;
+    this.connectedAt = 0;
     this.pollTimer = null;
     this.state = {
       power: null,            // 'on' | 'standby'
@@ -162,6 +163,10 @@ class EiscpClient extends EventEmitter {
       listComplete: false,    // true when we have the full list
       listNumberOfItems: 0,   // totale tracce dichiarato dal dispositivo (NLT)
       listCursor: 0,           // cursore nella lista NET (NLT)
+      listLayer: 1,            // layer corrente della lista (1 = radice del servizio)
+      listLayers: 1,           // ultimo valore di layer dichiarato da NLT
+      listUiType: null,        // '0' lista, '2' riproduzione (NLT)
+      listReqLayer: 1,         // layer usato nell'ultima richiesta XML (NLA)
       fileFormat: null,       // formato file (MP3, FLAC, DSD, WAV, …)
       sampleFrequency: null,  // frequenza di campionamento (Hz)
       bitRate: null,          // bitrate / bit profondità
@@ -210,7 +215,11 @@ class EiscpClient extends EventEmitter {
       this.connecting = false;
       this.connected = true;
       this.lastError = null;
+      this.connectedAt = Date.now();
+      this.lastMessageAt = Date.now();
       socket.setTimeout(0);
+      // Keepalive TCP: rileva più in fretta socket morte dopo lo standby.
+      try { socket.setKeepAlive(true, 15000); } catch (_) {}
       this.buffer = Buffer.alloc(0);
       this.logLine('out', 'TCP connected to ' + this.host + ':' + this.port);
       this.emit('status', this.status());
@@ -239,6 +248,17 @@ class EiscpClient extends EventEmitter {
     });
 
     socket.connect(this.port, this.host);
+  }
+
+  // Forza un tentativo di connessione immediato, annullando l'attesa del
+  // prossimo reconnect schedulato (usato dopo il Wake-on-LAN).
+  reconnectNow() {
+    this.shouldReconnect = true;
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+    if (!this.connected && !this.connecting) this.connect();
   }
 
   scheduleReconnect() {
@@ -304,6 +324,26 @@ class EiscpClient extends EventEmitter {
       this.send('CST', 'QSTN');
     }, 2000);
     if (this.cdPollTimer.unref) this.cdPollTimer.unref();
+
+    // Watchdog della connessione: se il ricevitore va in standby profondo la
+    // socket TCP può restare "aperta" senza FIN (half-open). In quel caso il
+    // client crederebbe di essere connesso e i comandi andrebbero persi.
+    // Se non arriva alcun messaggio per 25 s, la connessione viene chiusa e
+    // riavviata (il polling invia query ogni 10 s, quindi il silenzio è anomalo).
+    this.watchdogTimer = setInterval(() => this.checkStaleConnection(), 5000);
+    if (this.watchdogTimer.unref) this.watchdogTimer.unref();
+  }
+
+  // True se la socket è connessa ma il dispositivo non risponde più.
+  checkStaleConnection() {
+    if (!this.connected) return;
+    const last = this.lastMessageAt || this.connectedAt || 0;
+    if (!last) return;
+    const silentMs = Date.now() - last;
+    if (silentMs < 25000) return;
+    this.logLine('out', 'Nessuna risposta da ' + Math.round(silentMs / 1000) +
+      's: riconnessione');
+    try { this.socket.destroy(); } catch (_) {}
   }
 
   // Avanza il contatore delle tracce CD in base al tempo effettivamente
@@ -374,6 +414,10 @@ class EiscpClient extends EventEmitter {
     if (this.cdPollTimer) {
       clearInterval(this.cdPollTimer);
       this.cdPollTimer = null;
+    }
+    if (this.watchdogTimer) {
+      clearInterval(this.watchdogTimer);
+      this.watchdogTimer = null;
     }
   }
 
@@ -608,9 +652,16 @@ class EiscpClient extends EventEmitter {
       case 'NLT': {
         // NET/USB List Title Info
         // Format: xxuycccciiiillsraabbss + titleBar
+        //   u    = UI type (0 lista, 2 riproduzione, 3 popup)
         //   cccc = current cursor position (HEX)
         //   iiii = number of list items (HEX)
-        if (parameter.length >= 22) {
+        //   ll   = number of layers (HEX)
+        // Il HM86D tronca alcune risposte a 20 caratteri: si leggono i campi
+        // disponibili invece di scartare tutto.
+        if (parameter.length >= 3) {
+          this.state.listUiType = parameter.charAt(2);
+        }
+        if (parameter.length >= 14) {
           const cursorPos = parseInt(parameter.substring(4, 8), 16);
           const numberOfItems = parseInt(parameter.substring(8, 12), 16);
           const numberOfLayers = parseInt(parameter.substring(12, 14), 16);
@@ -619,6 +670,13 @@ class EiscpClient extends EventEmitter {
           this.state.listCursor = isNaN(cursorPos) ? this.state.listCursor : cursorPos;
           this.state.listNumberOfItems = isNaN(numberOfItems) ? 0 : numberOfItems;
           this.state.listNumberOfLayers = isNaN(numberOfLayers) ? 0 : numberOfLayers;
+          // In UI "playback" il NLT descrive il brano in riproduzione, non la
+          // lista: il layer di navigazione non va aggiornato da lì.
+          if (!isNaN(numberOfLayers) && numberOfLayers > 0 &&
+              this.state.listUiType !== '2') {
+            this.state.listLayers = numberOfLayers;
+            this.state.listLayer = numberOfLayers;
+          }
           if (cleanTitle && cleanTitle !== this.state.title) {
             this.state.title = cleanTitle;
           }
@@ -675,6 +733,7 @@ class EiscpClient extends EventEmitter {
               title: listedData,
               iconid: property === 'F' ? '29' : (property === '0' ? '36' : '2d'),
               icontype: property === 'F' ? 'F' : 'M',
+              layers: this.state.listLayer,
               selectable: true
             };
             const complete = this.state.listTotal > 0 &&
@@ -762,6 +821,7 @@ case 'NLA': {
           title: title, 
           iconid: iconid,
           icontype: icontype,
+          layers: this.state.listReqLayer || this.state.listLayer,
           selectable: selectable === '1'
         });
       }

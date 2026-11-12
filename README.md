@@ -9,9 +9,10 @@
 [![License](https://img.shields.io/badge/License-MIT-D9AB5B)](#-license)
 [![Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey)](#)
 [![Protocol](https://img.shields.io/badge/Protocol-eISCP%20TCP%2060128-D9AB5B)](#)
+[![Desktop](https://img.shields.io/badge/Desktop%20app-macOS%20%C2%B7%20Tauri%2FRust-D9AB5B)](#-standalone-macos-app-tauri--rust)
 [![Status](https://img.shields.io/badge/Status-Beta-blueviolet)](https://github.com/supergino/pioneer_player)
 
-> Control volume, sources, playback, tones, CD track info and USB/NET tracklists from any browser on your local network — no app install required.
+> Control volume, sources, playback, tones, CD track info and USB/NET tracklists from any browser on your local network — or from the **standalone macOS app** built with Tauri + Rust, with no terminal, no browser tab and no Node.js install required.
 >
 > 🟡 **Beta Version** — the project is under active development: features and bug fixes are added regularly.
 
@@ -21,17 +22,58 @@
 
 ## ✨ Highlights
 
+- 🖥️ **Standalone macOS app** (Tauri + Rust): one double-clickable `.app`/`.dmg` that bundles the server, the web UI and its own Node runtime
 - 🎚️ **Volume, mute, bass & treble** with graphical knobs
 - 📻 **Source selection** grouped by category (local, wired inputs, network, wireless)
 - ▶️ **Transport controls** (play/pause/stop/next/prev) for USB, NET and the built-in CD player
 - 💿 **CD player support** with animated disc, track counter and MusicBrainz tracklists
-- 📋 **USB/NET tracklist browser** with folders, search and instant playback
+- 📋 **USB/NET tracklist browser** with folders, search and instant playback — **switch track even while another one is playing**
+- ⏻ **Power on from standby** with eISCP + Wake-on-LAN fallback
+- 🔁 **Self-healing connection**: TCP keepalive, stale-socket watchdog and automatic reconnect
 - 🖼️ **Album art** in real time (with placeholder when unavailable)
 - 🎤 **Lyrics lookup** for the current track (works for CD too, via MusicBrainz)
 - 🔊 **DAC digital filter** selector (Slow / Sharp / Short)
 - 🌙 **Sleep timer** and **dimmer** control
 - 📡 **Server-Sent Events** for live state updates — no polling in the browser
-- 🩺 **Built-in diagnostics** (TCP ping, gateway, launchd context)
+- 🩺 **Built-in diagnostics** (TCP ping, gateway, launchd context, live eISCP log)
+
+---
+
+## 🖥️ Standalone macOS app (Tauri + Rust)
+
+**This project can also be used as a real desktop application, not only as a web page.**
+The `desktop/` folder contains a **Tauri (Rust) wrapper** that compiles the whole controller
+into a native macOS `.app`: no terminal, no browser tab, no separate Node.js installation.
+
+Why it is a true standalone app:
+
+- the **Rust binary** is the application shell; the Express server, the UI (`public/index.html`)
+  and an **official Node.js runtime** are embedded in the bundle (`Contents/Resources`);
+- on launch it picks a **free local port**, starts the bundled server on `127.0.0.1`
+  (loopback only — the UI is not exposed to the LAN), waits for the port and opens a
+  **native window** with the web UI;
+- on quit it **terminates the bundled Node process**, so no orphan servers are left behind;
+- it is signed ad-hoc for personal use and ships as a ready-to-drag `.dmg`.
+
+Build it (requires Rust toolchain + Xcode Command Line Tools + Node.js for the Tauri CLI):
+
+```bash
+cd desktop
+./scripts/build-app.sh
+```
+
+Output:
+
+```
+desktop/src-tauri/target/release/bundle/macos/Pioneer Controller.app
+desktop/src-tauri/target/release/bundle/dmg/Pioneer Controller_2.0.0_aarch64.dmg
+```
+
+Then drag **Pioneer Controller.app** to `/Applications` and double-click it. On first launch
+grant the **Local Network** permission (macOS asks once, via `NSLocalNetworkUsageDescription`),
+otherwise the app cannot reach the receiver.
+
+Full details, troubleshooting and environment variables: [`desktop/README.md`](desktop/README.md).
 
 ---
 
@@ -61,30 +103,53 @@ Unlike any other remote or controller for Pioneer/Onkyo receivers, this project 
 ## 🏗️ Architecture
 
 ```
-┌────────────┐   HTTP/SSE    ┌──────────────┐   TCP/eISCP    ┌─────────────────┐
-│  Browser   │ ◄───────────► │  server.js   │ ◄────────────► │  Pioneer HM86D  │
-│ index.html)│               │  (Express)   │   port 60128   │  (receiver)     │
-└────────────┘               └──────┬───────┘                └─────────────────┘
-                                    │
-                                    └── eiscp.js  (TCP client, state, polling)
+┌──────────────────────┐   HTTP/SSE   ┌──────────────┐   TCP/eISCP    ┌─────────────────┐
+│ Browser              │ ◄──────────► │  server.js   │ ◄────────────► │  Pioneer HM86D  │
+│ (public/index.html)  │              │  (Express)   │   port 60128   │  (receiver)     │
+└──────────────────────┘              └──────┬───────┘                └─────────────────┘
+                                             │
+                                             └── eiscp.js  (TCP client, state, polling)
+
+Standalone desktop build (desktop/):
+
+┌───────────────────────────────┐    native window    ┌────────────────────────────┐
+│ Pioneer Controller.app        │ ◄─────────────────► │  server.js + Node runtime  │
+│ (Rust / Tauri shell)          │  127.0.0.1:<port>   │  + public/index.html       │
+└───────────────────────────────┘                     └──────────────┬─────────────┘
+                                                                     │ eISCP 60128
+                                                                     ▼
+                                                            Pioneer HM86D receiver
 ```
 
 | File | Role |
 |---|---|
 | `server.js` | Express server, REST API, SSE stream, device client orchestration |
-| `eiscp.js` | eISCP TCP client, protocol parser, state machine, polling |
+| `eiscp.js` | eISCP TCP client, protocol parser, state machine, polling, Wake-on-LAN |
 | `public/index.html` | Single-page UI (HTML + CSS + JS, no build step) |
+| `desktop/` | **Tauri 2 (Rust) standalone app wrapper** with bundled Node runtime |
 | `launch.sh` / `stop.sh` | macOS/Linux service helpers |
+| `Avvia Pioneer.command` / `Chiudi Pioneer.command` | macOS double-click shortcuts (start / stop) |
 
 ---
 
 ## 🚀 Quick start
 
-### Prerequisites
+### Option A — Standalone macOS app (recommended on a Mac)
+
+Build once, then use it like any other Mac app: double click, native window, no terminal
+and no browser. See [Standalone macOS app](#-standalone-macos-app-tauri--rust) above.
+
+```bash
+cd desktop
+./scripts/build-app.sh
+open "src-tauri/target/release/bundle/macos/Pioneer Controller.app"
+```
+
+### Option B — Web server (macOS, Linux, Windows)
+
+#### Prerequisites
 - Node.js (LTS)
 - A Pioneer X-HM86D on the same LAN (default IP `192.168.100.6`)
-
-### Run
 
 ```bash
 git clone https://github.com/<your-user>/pioneer_player.git
@@ -101,15 +166,18 @@ DEVICE_HOST=192.168.1.50 ./launch.sh
 open http://localhost:3000
 ```
 
-Stop with `./stop.sh`.
+Stop with `./stop.sh` (or double-click `Chiudi Pioneer.command` on macOS).
 
 ### Environment variables
 
 | Variable | Default | Description |
 |---|---|---|
 | `HTTP_PORT` | `3000` | Web server port |
+| `HTTP_BIND` | `0.0.0.0` | Web server bind address (desktop app uses `127.0.0.1`) |
 | `DEVICE_HOST` | `192.168.100.6` | Receiver IP address |
 | `DEVICE_PORT` | `60128` | eISCP TCP port |
+| `DEVICE_MAC` | `00:09:B0:1F:A9:DF` | Receiver MAC address for Wake-on-LAN |
+| `DEVICE_BROADCAST` | `<device subnet>.255` | Broadcast address for the magic packet |
 
 ---
 
@@ -129,7 +197,26 @@ The HM86D does not report track number or playback time over eISCP. This app kee
 ### Tracklist
 - USB/NET lists load automatically at startup and on reconnect (watchdog every 4s until complete).
 - Search filters by title and artist; the term persists across folders.
+- **Switching track while playing works**: when the receiver enters "playback" UI (after a track starts), the app sends `NTC LIST` first, then `NLA I<layer><index>----` with the correct layer, so the new track starts without stopping playback.
+- The navigation layer is tracked per list (`state.listLayer` / `item.layers`), never a hardcoded value; full XML lists are not requested while the device is playing (the firmware answers `unsupported at this moment`).
 - CD tracklist comes from a selected MusicBrainz release.
+
+### Power on from standby
+- The ⏻ button is **always clickable**, even when the receiver is offline.
+- If the eISCP client is disconnected, clicking it sends a **Wake-on-LAN magic packet** and forces an immediate reconnect (`{ok:true, waking:true}`).
+- If `PWR 01` is sent but the state does not become `on` within 3 s, the app automatically falls back to Wake-on-LAN and retries.
+- MAC and broadcast are configurable (`DEVICE_MAC`, `DEVICE_BROADCAST`), with the broadcast derived from the device IP.
+- Requires **Network Standby / Wake on LAN** enabled on the receiver for deep-standby wake-up.
+
+### Connection resilience
+- TCP keepalive (`15 s`) on the eISCP socket.
+- **Stale-socket watchdog**: if no message arrives for 25 s the connection is considered half-open (typical after the receiver sleeps) and is closed/reopened.
+- Automatic reconnect with backoff, plus instant reconnect after Wake-on-LAN.
+- The UI shows `Offline · <error code>` instead of pretending to be connected.
+
+### Diagnostics
+- TCP probes on 60128, 8080, 5000, gateway test, launchd context.
+- **Live eISCP log** (last 15 messages with `→` sent / `←` received) inside the diagnostics panel, useful to verify whether commands reach the receiver.
 
 ---
 
@@ -139,15 +226,15 @@ The HM86D does not report track number or playback time over eISCP. This app kee
 |---|---|---|
 | `/api/state` | GET | Current device state + `sourceGroups` catalog |
 | `/api/events` | GET | SSE stream (`status`, `state`, `log`, `nla`) |
-| `/api/command` | POST `{action, value}` | Generic commands (`power`, `volume`, `input`, `play`, `bass`, `treble`, `digitalFilter`, `sleep`, `dimmer`, `raw`) |
-| `/api/list/*` | various | USB/NET list navigation (`refresh`, `select`, `back`, `up`, `down`, `snapshot`) |
+| `/api/command` | POST `{action, value}` | Generic commands (`power`, `volume`, `input`, `play`, `bass`, `treble`, `digitalFilter`, `sleep`, `dimmer`, `raw`). `power: "on"` while disconnected triggers Wake-on-LAN and replies `{ok:true, waking:true}` |
+| `/api/list/*` | various | USB/NET list navigation (`refresh`, `select`, `back`, `up`, `down`, `snapshot`). `select` accepts `{id, folder}`; it switches to list mode when the device is playing |
 | `/api/cd/*` | various | MusicBrainz lookup/search/release, track alignment, tracklist durations |
 | `/api/lyrics` | GET | Lyrics proxy (multiple sources, first match) |
 | `/api/art` | GET | Album art proxy (avoids CORS/mixed-content) |
 | `/api/host` | POST | Change device IP/port |
 | `/api/diag` | GET | Network diagnostics |
-| `/api/wol` | POST | Wake-on-LAN |
-| `/api/log` | GET | Last 100 log entries |
+| `/api/wol` | POST `{mac?, broadcast?}` | Wake-on-LAN magic packet (defaults from `DEVICE_MAC` / device subnet) |
+| `/api/log` | GET | Last 100 eISCP log entries |
 
 ---
 
@@ -205,6 +292,16 @@ node --check server.js
 HTTP_PORT=3100 node server.js
 ```
 
+### Standalone desktop build
+
+```bash
+cd desktop
+./scripts/build-app.sh      # prepare resources (server + Node runtime) + tauri build
+npm run dev                 # Tauri dev window with live resources
+```
+
+The build output is an unsigned (ad-hoc) `.app` plus a `.dmg`. See [`desktop/README.md`](desktop/README.md).
+
 ### Conventions
 - CommonJS, `'use strict'`, `const`/`let` (no `var`).
 - Comments in English.
@@ -224,11 +321,23 @@ pioneer/
 ├── eiscp.js           # TCP client & protocol parser
 ├── public/
 │   └── index.html     # Single-page UI
+├── desktop/           # Standalone macOS app (Tauri 2 + Rust)
+│   ├── README.md      # Build & usage of the desktop app
+│   ├── scripts/
+│   │   ├── prepare-resources.sh   # server + Node runtime into src-tauri/resources
+│   │   └── build-app.sh           # prepare + tauri build (.app / .dmg)
+│   └── src-tauri/
+│       ├── src/main.rs            # spawns the bundled server, opens the native window
+│       ├── tauri.conf.json
+│       ├── Info.plist             # NSLocalNetworkUsageDescription
+│       └── icons/
 ├── docs/
 │   ├── banner.png     # Hero image
 │   └── screenshot.png # App screenshot
 ├── launch.sh
-└── stop.sh
+├── stop.sh
+├── Avvia Pioneer.command
+└── Chiudi Pioneer.command
 ```
 
 ---

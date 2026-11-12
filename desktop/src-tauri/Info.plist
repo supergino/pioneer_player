@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!-- Necessario perché macOS mostri la richiesta di permesso "Rete locale":
+       senza, l'app può ricevere EHOSTUNREACH quando prova a contattare il
+       ricevitore Pioneer sulla LAN. -->
+  <key>NSLocalNetworkUsageDescription</key>
+  <string>Pioneer Controller si collega al ricevitore Pioneer/Onkyo sulla rete locale per controllarne alimentazione, volume, sorgenti e tracklist.</string>
+</dict>
+</plist>

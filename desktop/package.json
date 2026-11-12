@@ -1,0 +1,15 @@
+{
+  "name": "pioneer-desktop",
+  "private": true,
+  "version": "2.0.0",
+  "description": "Pioneer HM86D Controller - desktop app (Tauri)",
+  "scripts": {
+    "prepare:resources": "bash scripts/prepare-resources.sh",
+    "tauri": "tauri",
+    "build": "bash scripts/build-app.sh",
+    "dev": "bash scripts/prepare-resources.sh && tauri dev"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2"
+  }
+}

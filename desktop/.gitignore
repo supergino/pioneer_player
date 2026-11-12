@@ -1,0 +1,7 @@
+# Dipendenze e artefatti di build dell'app desktop
+node_modules/
+.cache/
+dist/
+src-tauri/resources/
+src-tauri/target/
+src-tauri/gen/

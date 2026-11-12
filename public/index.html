@@ -370,6 +370,7 @@
   .diag-list { display: flex; flex-direction: column; gap: 0; font-size: 13px; }
   .diag-list > div { display: flex; justify-content: space-between; gap: 14px; padding: 9px 0; border-bottom: 1px solid rgba(255,255,255,0.055); }
   .diag-list > div:last-child { border-bottom: none; }
+  .diag-log { margin: 8px 0 0; padding: 12px; background: rgba(0,0,0,0.28); border: 1px solid var(--border); border-radius: 10px; font: 11.5px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--muted); max-height: 210px; overflow: auto; white-space: pre-wrap; }
   .ok { color: var(--ok); }
   .bad { color: var(--err); }
   .warnc { color: var(--warn); }
@@ -1305,10 +1306,13 @@ function renderInputChips(current) {
 // --- State rendering -----------------------------------------------------
 function setEnabled(on) {
   [
-    'powerBtn', 'volSlider', 'volUp', 'volDown', 'muteBtn',
+    'volSlider', 'volUp', 'volDown', 'muteBtn',
     'prevBtn', 'playBtn', 'stopBtn', 'nextBtn',
     'sleepSel', 'dimmerSel',
   ].forEach((id) => { const el = $(id); if (el) el.disabled = !on; });
+  // Il pulsante Accendi resta sempre attivo: da offline invia un Wake-on-LAN.
+  const pb = $('powerBtn');
+  if (pb) pb.disabled = false;
   document.querySelectorAll('.chip').forEach((c) => { c.disabled = !on; });
   document.querySelectorAll('.knob').forEach((k) => {
     k.classList.toggle('disabled', !on);
@@ -1516,9 +1520,10 @@ function renderState(st) {
   const on = st.power === 'on';
   const pb = $('powerBtn');
   pb.classList.toggle('on', on);
-  pb.title = on ? 'Spegni (standby)' : 'Accendi';
+  if (!connected) pb.title = 'Accendi (Wake-on-LAN)';
+  else pb.title = on ? 'Spegni (standby)' : 'Accendi';
   if (!connected || !known) {
-    $('powerState').textContent = connected ? 'Lettura…' : 'Non connesso';
+    $('powerState').textContent = connected ? 'Lettura…' : 'Premi ⏻ · Wake-on-LAN';
   } else {
     $('powerState').textContent = on ? 'Acceso' : 'Standby';
   }
@@ -1688,9 +1693,20 @@ async function command(action, value, extra) {
   }
 }
 
-// Power
-$('powerBtn').addEventListener('click', () => {
-  command('power', state && state.power === 'on' ? 'off' : 'on');
+// Power — da offline invia un Wake-on-LAN e attende la riconnessione.
+$('powerBtn').addEventListener('click', async () => {
+  const connected = !!(status && status.connected);
+  if (connected) {
+    const turningOff = state && state.power === 'on';
+    if (!turningOff) $('powerState').textContent = 'Accensione…';
+    command('power', turningOff ? 'off' : 'on');
+    return;
+  }
+  $('powerState').textContent = 'Wake-on-LAN…';
+  const data = await command('power', 'on');
+  if (data && data.waking) {
+    toast('Magic packet inviato a ' + (data.mac || 'ricevitore') + ' · attendo la connessione');
+  }
 });
 
 // Volume
@@ -1926,9 +1942,22 @@ async function runDiag() {
         html += '<div class="warnc"><span>Nota</span><span>Timeout: IP errato, firewall o diversa subnet.</span></div>';
       }
       html += '<div class="hint">Se il server è stato avviato da Cursor/VS Code/Terminale e ottieni <code>EHOSTUNREACH</code>, su macOS 15+ manca il permesso <b>Rete locale</b> per quell\'app: usa <code>./launch.sh</code> (avvia il server via launchd) oppure abilita l\'app in <i>Impostazioni di Sistema → Privacy e sicurezza → Rete locale</i>.</div>';
+      html += '<div class="hint">Se il ricevitore è in standby e non risponde alla rete, abilita sul dispositivo <b>Network Standby</b> e <b>Wake on LAN</b>: il pulsante ⏻ invia un magic packet e riprova la connessione.</div>';
     } else {
       html += '<div class="ok"><span>Status</span><span>eISCP port reachable: commands work.</span></div>';
     }
+
+    // Ultimi messaggi eISCP: utilissimi per capire se un comando parte e se
+    // il ricevitore risponde (es. PWR 01 ignorato in standby).
+    try {
+      const lr = await fetch('/api/log');
+      const logs = await lr.json();
+      if (Array.isArray(logs) && logs.length) {
+        html += '<div class="hint" style="margin-top:10px"><b>Ultimi messaggi eISCP</b></div>';
+        html += '<pre class="diag-log">' + logs.slice(-15)
+          .map((e) => (e.dir === 'out' ? '→ ' : '← ') + esc(e.text)).join('\n') + '</pre>';
+      }
+    } catch (_) {}
     $('diagOut').innerHTML = html;
   } catch (e) {
     $('diagOut').textContent = 'Diagnostics error: ' + e.message;
@@ -2237,7 +2266,7 @@ function enterFolder(folderId) {
   fetch('/api/list/select', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ id: folderId }),
+    body: JSON.stringify({ id: folderId, folder: true }),
   }).then((r) => r.json()).then(() => {
     // La lista verrà aggiornata automaticamente via SSE dal dispositivo
   }).catch((e) => {
@@ -2255,7 +2284,7 @@ function playTrackFromList(index) {
     fetch('/api/list/select', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: track.id }),
+      body: JSON.stringify({ id: track.id, folder: false }),
     }).then((r) => r.json()).then((data) => {
       toast("Passaggio a: " + track.title);
     }).catch((e) => {
